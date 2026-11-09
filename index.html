@@ -91,6 +91,10 @@ textarea{resize:vertical;min-height:120px;line-height:1.5}
 .err{color:var(--bad);font-weight:700}
 .note{background:var(--violet-l);border-radius:12px;padding:12px 14px;color:var(--ink);font-size:.95rem}
 .note.warn{background:var(--warn-bg)}
+.note.good{background:var(--good-bg)}
+.rotext{white-space:pre-wrap;background:#f6f4fc;border-radius:10px;padding:12px 14px;overflow-wrap:anywhere}
+.pad-ink.ro{cursor:default;touch-action:auto}
+#save-note.unsaved{color:var(--warn);font-weight:800}
 
 /* pills & badges */
 .badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font-size:.78rem;font-weight:800;background:var(--lav);color:var(--ink);white-space:nowrap}
@@ -102,6 +106,7 @@ textarea{resize:vertical;min-height:120px;line-height:1.5}
 .pill.hid{background:#f1eff7;color:var(--muted)}
 .pill.vis{background:var(--good-bg);color:var(--good)}
 .pill.late{background:var(--bad-bg);color:var(--bad)}
+.pill.draft{background:var(--butter);color:#6b4f00}
 
 /* sign in */
 .hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:24px;align-items:center}
@@ -169,6 +174,7 @@ textarea{resize:vertical;min-height:120px;line-height:1.5}
 /* photos */
 .phs{display:flex;gap:10px;flex-wrap:wrap}
 .ph{position:relative;width:150px;height:150px;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#f4f2fa}
+.phsaved{width:100%;height:100%;display:grid;place-items:center;color:var(--muted);font-weight:800;font-size:.9rem;text-align:center;padding:8px}
 .ph img{width:100%;height:100%;object-fit:cover;display:block}
 .ph button{position:absolute;top:6px;right:6px;border:0;border-radius:99px;background:rgba(29,22,56,.8);color:#fff;font-weight:800;padding:2px 9px}
 .addph{width:150px;height:150px;border:2px dashed #cfc6ef;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--violet-d);font-weight:800;cursor:pointer;text-align:center;padding:10px}
@@ -309,15 +315,20 @@ const API = {
   async checkStudent(name, cls, pin){ return rpcOk(unwrap(await sb.rpc("check_student", { p_name: name, p_cls: cls, p_pin: pin || "" }))); },
   async getMyWork(name, cls, pin){ return (await API.checkStudent(name, cls, pin)).work; },
   async getProblemImage(id){ const p = IMG[id]; return p ? sb.storage.from("pictures").getPublicUrl(p).data.publicUrl : null; },
-  async submitWork(x){
+  async getWork(name, cls, pin, pid){ return rpcOk(unwrap(await sb.rpc("get_work", { p_name: name, p_cls: cls, p_pin: pin || "", p_problem: pid }))); },
+  async saveWork(x){
     const responses = [];
     for (const r of x.responses){
-      responses.push({ part: r.part, text: r.text,
-        drawing: r.drawing ? await uploadImage("work", "submissions", r.drawing) : null,
-        photos: await Promise.all((r.photos || []).map(ph => uploadImage("work", "submissions", ph))) });
+      const photos = [];
+      for (const ph of r.photos || []){
+        if (!ph.path && ph.data){ ph.path = await uploadImage("work", "submissions", ph.data); delete ph.data; }   // upload once, then reuse
+        if (ph.path) photos.push({ path: ph.path, thumb: ph.thumb || null });
+      }
+      responses.push({ part: r.part, text: r.text, strokes: r.strokes, height: r.height, grid: r.grid, photos });
     }
-    return rpcOk(unwrap(await sb.rpc("submit_work", { p_name: x.name, p_cls: x.cls, p_pin: x.pin || "", p_problem: x.problemId, p_responses: responses })));
+    return rpcOk(unwrap(await sb.rpc("save_work", { p_name: x.name, p_cls: x.cls, p_pin: x.pin || "", p_problem: x.problemId, p_responses: responses, p_submit: !!x.submit })));
   },
+  async unsubmitWork(name, cls, pin, pid){ return rpcOk(unwrap(await sb.rpc("unsubmit_work", { p_name: name, p_cls: cls, p_pin: pin || "", p_problem: pid }))); },
   async teacherSession(){
     const { data } = await sb.auth.getSession();
     if (!data || !data.session) return null;
@@ -335,29 +346,34 @@ const API = {
     const [roster, problems, subs, today] = await Promise.all([
       sb.from("roster").select("*").order("cls").order("name").then(unwrap),
       sb.from("problems").select("*").then(unwrap),
-      sb.from("submissions").select("*").order("submitted_at", { ascending: false }).then(unwrap),
+      sb.from("submissions").select("*").order("saved_at", { ascending: false }).then(unwrap),
       sb.rpc("local_today").then(unwrap)]);
     return { today,
       roster: roster.map(r => ({ name: r.name, cls: r.cls, pin: r.pin, active: r.active })),
       problems: problems.map(rowToProblem),
       submissions: subs.map(s => { RAW[s.id] = s.responses || []; return {
-        id: s.id, submitted: s.submitted_at, student: s.student, cls: s.cls, problemId: s.problem_id || "", problem: s.problem_title,
+        id: s.id, submitted: s.submitted_at || "", savedAt: s.saved_at || "", student: s.student, cls: s.cls, problemId: s.problem_id || "", problem: s.problem_title,
         attempt: s.attempt, status: s.status, score: s.score == null ? null : Number(s.score), points: Number(s.points) || 0,
         feedback: s.feedback || "", reviewed: s.reviewed_at || "",
-        responses: (s.responses || []).map(r => ({ part: r.part, text: r.text, drawing: !!r.drawing, photos: (r.photos || []).length })) }; }) };
+        responses: (s.responses || []).map(r => ({ part: r.part, text: r.text, drawing: !!r.drawing || strokesAfterClear(r.strokes || []).length > 0, photos: (r.photos || []).length })) }; }) };
   },
   async getSubmissionImages(_, id){
     const resp = RAW[id] || [];
-    const paths = resp.flatMap(r => [r.drawing, ...(r.photos || [])]).filter(Boolean);
+    const pathOf = ph => typeof ph === "string" ? ph : ph && ph.path;
+    const paths = resp.flatMap(r => [r.drawing, ...(r.photos || []).map(pathOf)]).filter(Boolean);
     const urls = {};
     if (paths.length){
       const signed = unwrap(await sb.storage.from("work").createSignedUrls(paths, 3600));
-      signed.forEach(s => { if (s.signedUrl) urls[s.path] = s.signedUrl; });
+      signed.forEach(x => { if (x.signedUrl) urls[x.path] = x.signedUrl; });
     }
-    return resp.map(r => ({ drawing: r.drawing ? urls[r.drawing] || null : null, photos: (r.photos || []).map(p => urls[p]).filter(Boolean) }));
+    return resp.map(r => ({
+      drawing: r.drawing ? urls[r.drawing] || null : Pad.exportPNG({ strokes: r.strokes || [], height: r.height || 620, grid: r.grid !== false }),
+      photos: (r.photos || []).map(ph => urls[pathOf(ph)]).filter(Boolean) }));
   },
   async saveReview(_, id, rv){
-    unwrap(await sb.from("submissions").update({ status: rv.status, score: rv.score === "" ? null : rv.score, feedback: rv.feedback || "", reviewed_at: new Date().toISOString() }).eq("id", id));
+    const rows = unwrap(await sb.from("submissions").update({ status: rv.status, score: rv.score === "" ? null : rv.score, feedback: rv.feedback || "", reviewed_at: new Date().toISOString() })
+      .eq("id", id).neq("status", "Draft").select("id"));
+    if (!rows.length) throw new Error("The student unsubmitted this to make changes, so it can't be graded right now. Click Refresh on the list.");
     return true;
   },
   async saveProblem(_, p){
@@ -481,8 +497,7 @@ function setNav(items, current){
   $$("button", nav).forEach(b => b.onclick = () => navGo(b.dataset.k));
 }
 function navGo(k){
-  if (k === "board" || k === "mywork"){ S.view = k; renderStudent(); }
-  else if (k === "switch"){ signOut(); }
+  if (k === "board" || k === "mywork" || k === "switch") return guardLeave(() => { if (k === "switch") signOut(); else { S.view = k; renderStudent(); } window.scrollTo(0, 0); });
   else if (k === "t-exit"){ S.t.data = null; startStudent(); }
   else if (k === "t-out"){ S.t.data = null; api("teacherSignOut").finally(startStudent); }
   else { S.t.view = k; S.t.subId = null; S.t.edit = null; renderTeacher(); }
@@ -510,7 +525,7 @@ async function startStudent(){
   }
 }
 function signOut(){
-  S.me = null; S.work = []; ss.del("tb-me"); S.view = "board"; renderStudent();
+  S.me = null; S.work = []; S.drafts = {}; ss.del("tb-me"); S.view = "board"; renderStudent();
 }
 function myProblems(){
   if (!S.data) return [];
@@ -522,6 +537,7 @@ function statusPill(w){
   if (!w) return `<span class="pill todo">Not started</span>`;
   if (w.status === "Reviewed") return `<span class="pill done">${w.score != null ? `Scored ${w.score}/${w.points}` : "Reviewed"}</span>`;
   if (w.status === "Revise") return `<span class="pill rev">Revise &amp; resubmit</span>`;
+  if (w.status === "Draft") return `<span class="pill draft">In progress</span>`;
   return `<span class="pill in">Turned in</span>`;
 }
 function renderStudent(){
@@ -588,7 +604,7 @@ function renderBoard(){
   const probs = myProblems();
   const today = S.data.today || todayISO();
   const latest = {}; S.work.forEach(w => { if (!latest[w.problemId]) latest[w.problemId] = w; });
-  const done = probs.filter(p => latest[p.id]).length;
+  const done = probs.filter(p => latest[p.id] && latest[p.id].status !== "Draft").length;
   const pts = Object.values(latest).reduce((a, w) => a + (w.status === "Reviewed" && w.score != null ? w.score : 0), 0);
   const weeks = {};
   probs.forEach(p => { const k = p.postDate ? mondayOf(p.postDate) : "anytime"; (weeks[k] = weeks[k] || []).push(p); });
@@ -605,7 +621,7 @@ function renderBoard(){
       <section class="week stack" style="gap:12px">
         <h2>${k === "anytime" ? "Anytime" : "Week of " + esc(fmtShort(k))}${k === thisWeek ? " <small>This week</small>" : ""}</h2>
         <div class="cards">${weeks[k].sort((a, b) => (a.postDate || "").localeCompare(b.postDate || "") || a.title.localeCompare(b.title)).map(p => {
-          const w = latest[p.id]; const late = p.dueDate && p.dueDate < today && !w;
+          const w = latest[p.id]; const late = p.dueDate && p.dueDate < today && (!w || w.status === "Draft");
           return `<button class="pcard" type="button" data-pid="${esc(p.id)}" style="--tc:${typeColor(p.type)}">
             <div class="band"><span class="t">${esc(p.type || "Challenge")}</span><span class="pts">${p.points} pts</span></div>
             <div class="body">
@@ -618,62 +634,123 @@ function renderBoard(){
   $$(".pcard").forEach(b => b.onclick = () => openProblem(b.dataset.pid));
 }
 
-/* ---- drafts ---- */
+/* ---- saved work ---- */
+const EDITABLE = s => !s || s === "Draft" || s === "Revise";
 function draftKey(pid){ return "tb-d:" + S.me.name + "|" + S.me.cls + "|" + pid; }
-function getDraft(p){
-  if (S.drafts[p.id]) return S.drafts[p.id];
-  const n = Math.max(1, p.parts.length);
-  let d = ss.get(draftKey(p.id));
-  if (!d || !Array.isArray(d.parts) || d.parts.length !== n) d = { parts: Array.from({length: n}, () => ({})) };
-  d.parts.forEach(x => { x.tab = x.tab || "write"; x.text = x.text || ""; x.strokes = x.strokes || []; x.redo = []; x.photos = x.photos || []; if (x.grid === undefined) x.grid = true; x.height = x.height || 620; });
-  return (S.drafts[p.id] = d);
+const blankPart = () => ({ tab: "write", text: "", strokes: [], redo: [], photos: [], grid: true, height: 620 });
+function partFromServer(r){
+  r = r || {};
+  return { tab: "write", text: r.text || "", strokes: Array.isArray(r.strokes) ? r.strokes : [], redo: [], grid: r.grid !== false, height: r.height || 620,
+    photos: (r.photos || []).map(ph => typeof ph === "string" ? { path: ph, thumb: null } : ph).filter(ph => ph && ph.path).map(ph => ({ path: ph.path, thumb: ph.thumb || null })) };
 }
-let draftT;
-function saveDraft(pid){
-  clearTimeout(draftT);
-  draftT = setTimeout(() => {
-    const d = S.drafts[pid]; if (!d || !S.me) return;
-    ss.set(draftKey(pid), { parts: d.parts.map(x => ({ tab:x.tab, text:x.text, strokes:x.strokes, photos:x.photos, grid:x.grid, height:x.height })) });
-    const n = $("#draft-note"); if (n) n.textContent = "Draft saved on this device";
-  }, 700);
+function applyItem(d, item){
+  d.status = item ? item.status : null; d.savedAt = item ? item.savedAt || "" : ""; d.submitted = item ? item.submitted || "" : "";
+  d.attempt = item ? item.attempt || 0 : 0; d.feedback = item ? item.feedback || "" : ""; d.score = item && item.score != null ? Number(item.score) : null;
+  if (item && item.points != null) d.points = Number(item.points);
+}
+function buildDraft(p, item){
+  const n = Math.max(1, p.parts.length);
+  const d = { pid: p.id, points: p.points, dirty: false,
+    parts: Array.from({ length: n }, (_, i) => item && item.responses && item.responses[i] ? partFromServer(item.responses[i]) : blankPart()) };
+  applyItem(d, item);
+  if (EDITABLE(d.status)){
+    const b = ss.get(draftKey(p.id));
+    if (b && b.base === d.savedAt && Array.isArray(b.parts) && b.parts.length === n){
+      d.parts = b.parts.map(x => Object.assign(blankPart(), x, { redo: [] })); d.dirty = true;
+    }
+  }
+  d.parts.forEach(x => { x.tab = hasText(x) ? "write" : hasDraw(x) ? "draw" : hasPhoto(x) ? "photo" : "write"; });
+  return d;
+}
+let backupT;
+function markDirty(d){
+  d.dirty = true; updateSaveNote(d);
+  clearTimeout(backupT);
+  backupT = setTimeout(() => ss.set(draftKey(d.pid), { base: d.savedAt, parts: d.parts.map(x => ({ text: x.text, strokes: x.strokes, photos: x.photos, grid: x.grid, height: x.height })) }), 600);
+}
+function updateSaveNote(d){
+  const n = $("#save-note"); if (!n) return;
+  n.textContent = d.dirty ? "You have unsaved changes" : d.savedAt ? "Saved " + fmtWhen(d.savedAt) : "Not saved yet";
+  n.classList.toggle("unsaved", !!d.dirty);
 }
 const strokesAfterClear = st => { let i = st.length - 1; while (i >= 0 && !st[i].x) i--; return st.slice(i + 1); };
 const hasDraw = x => strokesAfterClear(x.strokes).length > 0;
 const hasText = x => !!x.text.trim();
 const hasPhoto = x => x.photos.length > 0;
 
-function openProblem(pid){ S.pid = pid; S.view = "problem"; renderStudent(); window.scrollTo(0, 0); }
+/* leaving a challenge with unsaved changes */
+function currentDirty(){
+  if (S.view !== "problem" || !S.me) return null;
+  const d = S.drafts[S.pid];
+  return d && d.dirty && EDITABLE(d.status) ? d : null;
+}
+function guardLeave(go){
+  const d = currentDirty(); if (!d) return go();
+  const p = myProblems().find(x => x.id === d.pid);
+  const box = modal(`<h2>Save your work first?</h2><p class="muted">You made changes that aren't saved yet.</p>
+    <div class="row"><button class="btn" type="button" id="g-save">Save and leave</button><button class="btn ghost" type="button" id="g-leave">Leave without saving</button><button class="btn ghost" type="button" id="g-stay">Stay here</button></div>`);
+  $("#g-stay", box).onclick = closeModal;
+  $("#g-leave", box).onclick = () => { closeModal(); ss.del(draftKey(d.pid)); delete S.drafts[d.pid]; go(); };
+  $("#g-save", box).onclick = async () => { if (p && await persist(p, d, false)){ closeModal(); go(); } };
+}
+window.addEventListener("beforeunload", e => { if (currentDirty()){ e.preventDefault(); e.returnValue = ""; } });
+
+function openProblem(pid){
+  const d = S.drafts[pid]; if (d && !d.dirty) delete S.drafts[pid];   // always show the latest saved copy
+  S.pid = pid; S.view = "problem"; renderStudent(); window.scrollTo(0, 0);
+}
+
+function statusBanner(d){
+  if (d.status === "Reviewed") return `<div class="note good"><div class="row"><span class="pill done">${d.score != null ? `Scored ${d.score}/${d.points}` : "Graded"}</span><b>Graded and locked.</b></div>
+    ${d.feedback ? `<p style="margin-top:8px;white-space:pre-wrap"><b>Feedback:</b> ${esc(d.feedback)}</p>` : ""}</div>`;
+  if (d.status === "Revise") return `<div class="note warn"><div class="row"><span class="pill rev">Sent back for changes</span></div>
+    ${d.feedback ? `<p style="margin-top:8px;white-space:pre-wrap"><b>Feedback:</b> ${esc(d.feedback)}</p>` : ""}
+    <p style="margin-top:6px">Make your changes, then turn it in again.</p></div>`;
+  if (d.status === "Needs review") return `<div class="note"><div class="row"><span class="pill in">Turned in</span><span class="dim">${esc(fmtWhen(d.submitted))}</span></div>
+    <p style="margin-top:6px">Waiting for your teacher to review it. Need to change something? Click <b>Unsubmit</b> at the bottom, fix it, then turn it in again.</p></div>`;
+  if (d.status === "Draft") return `<div class="note"><div class="row"><span class="pill draft">In progress</span><span class="dim">Saved ${esc(fmtWhen(d.savedAt))}. Not turned in yet.</span></div></div>`;
+  return "";
+}
 
 function renderProblem(){
   const p = myProblems().find(x => x.id === S.pid);
   if (!p){ S.view = "board"; return renderBoard(); }
-  const d = getDraft(p);
-  const w = latestFor(p.id);
+  const d = S.drafts[p.id];
+  if (!d){
+    app.innerHTML = `<div class="card empty"><div class="spin" aria-hidden="true"></div><p style="margin-top:12px">Opening your work…</p></div>`;
+    api("getWork", S.me.name, S.me.cls, S.me.pin, p.id).then(r => {
+      S.drafts[p.id] = buildDraft(p, r.item);
+      if (S.view === "problem" && S.pid === p.id) renderProblem();
+    }).catch(e => {
+      app.innerHTML = `<div class="card empty"><h2>Your work didn't open</h2><p style="margin-top:6px">${esc(errMsg(e))}</p><p style="margin-top:14px"><button class="btn" type="button" id="back">Back to challenges</button></p></div>`;
+      $("#back").onclick = () => { S.view = "board"; renderStudent(); };
+    });
+    return;
+  }
+  const editable = EDITABLE(d.status);
   const today = S.data.today || todayISO();
   const parts = p.parts.length ? p.parts : [""];
   app.innerHTML = `
     <div><button class="link" type="button" id="back">← All challenges</button></div>
     <section class="card phead">
       <div class="row"><span class="badge" style="background:${typeColor(p.type)}">${esc(p.type || "Challenge")}</span><span class="badge" style="background:#f1eff7">${p.points} points</span>
-        ${p.dueDate ? `<span class="badge" style="background:${p.dueDate < today ? "var(--bad-bg)" : "#f1eff7"}">Due ${esc(fmtDay(p.dueDate))}</span>` : ""}</div>
+        ${p.dueDate ? `<span class="badge" style="background:${p.dueDate < today && editable ? "var(--bad-bg)" : "#f1eff7"}">Due ${esc(fmtDay(p.dueDate))}</span>` : ""}</div>
       <h2 style="font-size:1.6rem">${esc(p.title)}</h2>
       <p class="muted">${esc([unitLabel(p.units), p.topics].filter(Boolean).join(" · "))}</p>
-      ${w ? `<div class="note ${w.status === "Revise" ? "warn" : ""}">
-        <div class="row">${statusPill(w)}<span class="dim">You turned this in ${esc(fmtWhen(w.submitted))}${w.attempt > 1 ? ` (try ${w.attempt})` : ""}.</span></div>
-        ${w.feedback ? `<p style="margin-top:8px;white-space:pre-wrap"><b>Feedback:</b> ${esc(w.feedback)}</p>` : ""}
-        <p class="dim" style="margin-top:6px">You can turn it in again if you want to improve it.</p></div>` : ""}
+      ${statusBanner(d)}
     </section>
     <section class="card prompt" id="prompt">${md(p.prompt)}${p.hasImage ? `<div id="pimg" class="dim">Loading picture…</div>` : ""}</section>
-    <p class="muted" style="font-weight:700">For each part, show your thinking by typing it, drawing it, or adding a photo of your paper. You can use more than one.</p>
+    ${editable ? `<p class="muted" style="font-weight:700">For each part, show your thinking by typing it, drawing it, or adding a photo of your paper. You can use more than one. Click <b>Save work</b> to finish later.</p>` : ""}
     ${parts.map((q, i) => `
       <section class="card part" data-i="${i}">
         <div class="part-h"><span class="part-l">${p.parts.length ? LETTERS[i] : "✓"}</span><div class="part-q">${q ? md(q) : "<p>Show your work and explain your thinking.</p>"}</div></div>
         <div class="wtabs" role="tablist" aria-label="Ways to show your work"></div>
         <div class="warea"></div>
       </section>`).join("")}
-    <div class="turnin"><button class="btn big" type="button" id="submit">Turn it in</button><span class="dim" id="draft-note">Your work saves on this device until you turn it in.</span></div>
+    ${editable ? `<div class="turnin"><button class="btn big" type="button" id="submit">${d.status === "Revise" ? "Turn it in again" : "Turn it in"}</button><button class="btn ghost big" type="button" id="save">Save work</button><span class="dim" id="save-note"></span></div>`
+      : d.status === "Needs review" ? `<div class="turnin"><button class="btn ghost big" type="button" id="unsubmit">Unsubmit to make changes</button><span class="dim">Your teacher can't grade it while it's unsubmitted.</span></div>` : ""}
   `;
-  $("#back").onclick = () => { S.view = "board"; renderStudent(); };
+  $("#back").onclick = () => guardLeave(() => { S.view = "board"; renderStudent(); });
   typeset(app);
   if (p.hasImage){
     api("getProblemImage", p.id, "").then(url => {
@@ -682,18 +759,23 @@ function renderProblem(){
     }).catch(() => { const el = $("#pimg"); if (el) el.textContent = "The picture didn't load."; });
   }
   $$(".part").forEach(sec => renderWork(p, d, +sec.dataset.i));
-  $("#submit").onclick = () => confirmSubmit(p, d);
+  updateSaveNote(d);
+  if ($("#submit")) $("#submit").onclick = () => confirmSubmit(p, d);
+  if ($("#save")) $("#save").onclick = async () => { if (await persist(p, d, false)){ closeModal(); toast("Saved! You can come back and finish any time."); renderProblem(); } };
+  if ($("#unsubmit")) $("#unsubmit").onclick = () => confirmUnsubmit(p, d);
 }
 
 function renderWork(p, d, i){
   const sec = $(`.part[data-i="${i}"]`); const x = d.parts[i];
-  const tabs = [["write","Type it",hasText(x)],["draw","Draw it",hasDraw(x)],["photo","Photo",hasPhoto(x)]];
+  const ro = !EDITABLE(d.status);
+  const tabs = [["write", "Type it", hasText(x)], ["draw", "Draw it", hasDraw(x)], ["photo", "Photo", hasPhoto(x)]];
   $(".wtabs", sec).innerHTML = tabs.map(([k, l, has]) => `<button class="wtab" role="tab" type="button" data-k="${k}" aria-selected="${x.tab === k}">${l}${has ? '<span class="dot" aria-label="has work"></span>' : ""}</button>`).join("");
-  $$(".wtab", sec).forEach(b => b.onclick = () => { x.tab = b.dataset.k; saveDraft(p.id); renderWork(p, d, i); });
+  $$(".wtab", sec).forEach(b => b.onclick = () => { x.tab = b.dataset.k; renderWork(p, d, i); });
   const area = $(".warea", sec);
-  const changed = () => { saveDraft(p.id); const has = { write: hasText(x), draw: hasDraw(x), photo: hasPhoto(x) };
+  const changed = () => { markDirty(d); const has = { write: hasText(x), draw: hasDraw(x), photo: hasPhoto(x) };
     $$(".wtab", sec).forEach(b => { const dot = $(".dot", b); if (has[b.dataset.k] && !dot) b.insertAdjacentHTML("beforeend", '<span class="dot" aria-label="has work"></span>'); if (!has[b.dataset.k] && dot) dot.remove(); }); };
   if (x.tab === "write"){
+    if (ro){ area.innerHTML = hasText(x) ? `<div class="rotext">${esc(x.text)}</div>` : `<p class="dim">Nothing typed for this part.</p>`; return; }
     const keys = ["²","³","√","π","×","÷","−","±","≤","≥","≠","≈","°","½","¼","¾","→"];
     area.innerHTML = `<div class="mkeys" aria-label="Math symbols">${keys.map(k => `<button type="button" class="mkey" data-k="${k}">${k}</button>`).join("")}</div>
       <textarea aria-label="Type your work for this part" placeholder="Write each step on its own line, and explain why you did it.">${esc(x.text)}</textarea>`;
@@ -705,17 +787,19 @@ function renderWork(p, d, i){
       ta.selectionStart = ta.selectionEnd = s + b.dataset.k.length; ta.focus(); x.text = ta.value; changed();
     });
   } else if (x.tab === "draw"){
-    new Pad(area, x, changed);
+    if (ro && !hasDraw(x)){ area.innerHTML = `<p class="dim">No drawing for this part.</p>`; return; }
+    new Pad(area, x, changed, ro);
   } else {
-    area.innerHTML = `<div class="phs">${x.photos.map((u, j) => `<div class="ph"><img src="${u}" alt="Photo ${j+1} of your work"><button type="button" data-j="${j}" aria-label="Remove photo ${j+1}">✕</button></div>`).join("")}
-      ${x.photos.length < 3 ? `<label class="addph"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Add a photo<input type="file" accept="image/*" multiple hidden></label>` : ""}</div>
-      <p class="dim" style="margin-top:8px">Take a clear picture of your paper in good light. Up to 3 photos per part.</p>`;
+    if (ro && !hasPhoto(x)){ area.innerHTML = `<p class="dim">No photos for this part.</p>`; return; }
+    area.innerHTML = `<div class="phs">${x.photos.map((ph, j) => `<div class="ph">${ph.thumb || ph.data ? `<img src="${ph.thumb || ph.data}" alt="Photo ${j + 1} of your work">` : `<div class="phsaved">Photo ${j + 1} saved</div>`}${ro ? "" : `<button type="button" data-j="${j}" aria-label="Remove photo ${j + 1}">✕</button>`}</div>`).join("")}
+      ${!ro && x.photos.length < 3 ? `<label class="addph"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Add a photo<input type="file" accept="image/*" multiple hidden></label>` : ""}</div>
+      ${ro ? "" : `<p class="dim" style="margin-top:8px">Take a clear picture of your paper in good light. Up to 3 photos per part.</p>`}`;
     $$(".ph button", area).forEach(b => b.onclick = () => { x.photos.splice(+b.dataset.j, 1); changed(); renderWork(p, d, i); });
     const inp = $("input[type=file]", area);
     if (inp) inp.onchange = async () => {
       const files = Array.from(inp.files || []).slice(0, 3 - x.photos.length);
       for (const f of files){
-        try { x.photos.push(await shrinkImage(f)); }
+        try { x.photos.push({ data: await shrinkImage(f), thumb: await shrinkImage(f, 420, 0.6) }); }
         catch { toast("That photo couldn't be opened. Try a JPG or PNG, or take a screenshot.", true); }
       }
       changed(); renderWork(p, d, i);
@@ -741,9 +825,14 @@ function shrinkImage(file, max = 1600, q = 0.82){
 const PEN_COLORS = [["#1d1638","Black"],["#2f6bff","Blue"],["#e0244d","Red"],["#13955a","Green"]];
 const PAD_W = 1000;
 class Pad {
-  constructor(host, st, onChange){
+  constructor(host, st, onChange, readonly){
     this.st = st; this.onChange = onChange;
     this.color = st.color || PEN_COLORS[0][0]; this.size = st.size || 4; this.erase = false; this.sawPen = false;
+    if (readonly){
+      host.innerHTML = `<div class="pad-wrap"><canvas class="pad-bg"></canvas><canvas class="pad-ink ro" aria-label="Your drawing"></canvas></div>`;
+      this.host = host; this.wrap = $(".pad-wrap", host); this.bg = $(".pad-bg", host); this.ink = $(".pad-ink", host);
+      this.size_(); return;
+    }
     host.innerHTML = `
       <div class="pad-tools" role="toolbar" aria-label="Drawing tools">
         <div class="tg">${PEN_COLORS.map(([c, n]) => `<button type="button" class="sw" data-c="${c}" style="--sw:${c}" aria-label="${n} pen"></button>`).join("")}</div>
@@ -833,7 +922,7 @@ class Pad {
     const cl = $('[data-a="clear"]', this.host); if (cl) cl.disabled = !hasDraw(this.st);
   }
   static exportPNG(st){
-    const strokes = strokesAfterClear(st.strokes); if (!strokes.length) return null;
+    const strokes = strokesAfterClear(st.strokes || []); if (!strokes.length) return null;
     // crop height to the drawn content (+ margin) so pictures aren't mostly blank
     let maxY = 0; strokes.forEach(s => { if (!s.e) s.p.forEach(q => { if (q[1] > maxY) maxY = q[1]; }); });
     const h = Math.min(st.height, Math.max(300, Math.ceil((maxY + 60) / 40) * 40));
@@ -845,7 +934,22 @@ class Pad {
   }
 }
 
-/* ---- submit ---- */
+/* ---- save, turn in, unsubmit ---- */
+async function persist(p, d, submit){
+  modal(`<div class="stack" style="align-items:center;text-align:center;padding:16px 0"><div class="spin" aria-hidden="true"></div><h2>${submit ? "Turning in your work…" : "Saving your work…"}</h2><p class="muted">Photos can take a few seconds. Please don't close this page.</p></div>`, { locked: true });
+  try {
+    const responses = d.parts.map((x, i) => ({ part: p.parts.length ? LETTERS[i] : "", text: x.text, strokes: strokesAfterClear(x.strokes), height: x.height, grid: x.grid, photos: x.photos }));
+    const res = await api("saveWork", { name: S.me.name, cls: S.me.cls, pin: S.me.pin, problemId: p.id, responses, submit });
+    d.parts.forEach(x => { x.strokes = strokesAfterClear(x.strokes); x.redo = []; });
+    applyItem(d, res.item); d.dirty = false; ss.del(draftKey(p.id));
+    if (Array.isArray(res.work)) S.work = res.work;
+    return true;
+  } catch (e){
+    const box = modal(`<h2>That didn't go through</h2><p>${esc(errMsg(e))}</p><p class="muted">Your work is still on this page. Try again in a moment.</p><div class="row"><button class="btn" type="button" id="m-ok">OK</button></div>`);
+    $("#m-ok", box).onclick = closeModal;
+    return false;
+  }
+}
 function confirmSubmit(p, d){
   const labels = p.parts.length ? p.parts.map((_, i) => "Part " + LETTERS[i]) : ["Your work"];
   const rows = d.parts.map((x, i) => {
@@ -857,31 +961,30 @@ function confirmSubmit(p, d){
     <h2>Ready to turn it in?</h2>
     <ul class="checks">${rows.map(r => `<li><span class="${r.ok ? "ok" : "no"}">${r.ok ? "✓" : "!"}</span><b>${esc(r.label)}</b><span class="muted">${r.ok ? esc(r.what.join(" + ")) : "Nothing yet"}</span></li>`).join("")}</ul>
     ${!any ? `<p class="err">Add some work before you turn it in.</p>` : missing ? `<div class="note warn">${missing === 1 ? "One part is" : missing + " parts are"} empty. You can still turn it in, but you might miss points.</div>` : `<div class="note">Did you explain your thinking, not just the answer? Explanations earn the most points.</div>`}
+    <p class="dim">After you turn it in, you can still unsubmit and make changes until your teacher grades it.</p>
     <div class="row"><button class="btn" type="button" id="m-go" ${any ? "" : "disabled"}>Turn it in</button><button class="btn ghost" type="button" id="m-no">Keep working</button></div>`);
   $("#m-no", box).onclick = closeModal;
-  $("#m-go", box).onclick = () => doSubmit(p, d);
-}
-async function doSubmit(p, d){
-  modal(`<div class="stack" style="align-items:center;text-align:center;padding:16px 0"><div class="spin" aria-hidden="true"></div><h2>Turning in your work…</h2><p class="muted">Pictures can take a few seconds. Please don't close this page.</p></div>`, { locked: true });
-  try {
-    const responses = d.parts.map((x, i) => ({
-      part: p.parts.length ? LETTERS[i] : "",
-      text: x.text.trim(),
-      drawing: Pad.exportPNG(x),
-      photos: x.photos.slice(0, 3)
-    }));
-    const res = await api("submitWork", { name: S.me.name, cls: S.me.cls, pin: S.me.pin, problemId: p.id, responses });
-    ss.del(draftKey(p.id)); delete S.drafts[p.id];
-    if (Array.isArray(res.work)) S.work = res.work;
-    const box = modal(`<div class="stack" style="align-items:center;text-align:center;padding:10px 0">
+  $("#m-go", box).onclick = async () => {
+    if (!await persist(p, d, true)) return;
+    const ok = modal(`<div class="stack" style="align-items:center;text-align:center;padding:10px 0">
       <div class="bigcheck"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#16794a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
-      <h2>Turned in!</h2><p class="muted">“${esc(p.title)}”${res.attempt > 1 ? ` (try ${res.attempt})` : ""} is on its way to your teacher. Check <b>My work</b> for your score and feedback.</p>
+      <h2>Turned in!</h2><p class="muted">“${esc(p.title)}” is on its way to your teacher. If you notice a mistake before it's graded, open it and click <b>Unsubmit</b>.</p>
       <button class="btn" type="button" id="m-ok">Back to challenges</button></div>`);
-    $("#m-ok", box).onclick = () => { closeModal(); S.view = "board"; renderStudent(); window.scrollTo(0, 0); };
-  } catch (e){
-    const box = modal(`<h2>That didn't go through</h2><p>${esc(errMsg(e))}</p><p class="muted">Your work is still here. Try again in a moment.</p><div class="row"><button class="btn" type="button" id="m-ok">OK</button></div>`);
-    $("#m-ok", box).onclick = closeModal;
-  }
+    $("#m-ok", ok).onclick = () => { closeModal(); S.view = "board"; renderStudent(); window.scrollTo(0, 0); };
+  };
+}
+function confirmUnsubmit(p, d){
+  const box = modal(`<h2>Unsubmit this challenge?</h2><p class="muted">It goes back to being a draft so you can change it. Your teacher won't see it until you turn it in again.</p>
+    <div class="row"><button class="btn" type="button" id="m-go">Unsubmit</button><button class="btn ghost" type="button" id="m-no">Cancel</button></div>`);
+  $("#m-no", box).onclick = closeModal;
+  $("#m-go", box).onclick = async () => {
+    $("#m-go", box).disabled = true;
+    try {
+      const res = await api("unsubmitWork", S.me.name, S.me.cls, S.me.pin, p.id);
+      applyItem(d, res.item); if (Array.isArray(res.work)) S.work = res.work;
+      closeModal(); toast("Unsubmitted. Make your changes, then turn it in again."); renderProblem();
+    } catch (e){ closeModal(); toast(errMsg(e), true); delete S.drafts[p.id]; renderProblem(); }
+  };
 }
 
 function renderMyWork(){
@@ -891,16 +994,16 @@ function renderMyWork(){
       const open = S.data.problems.some(p => p.id === w.problemId);
       return `<section class="card witem">
         <div class="row"><h3 style="flex:1;min-width:12em">${esc(w.problem)}</h3>${statusPill(w)}</div>
-        <p class="dim">Turned in ${esc(fmtWhen(w.submitted))}${w.attempt > 1 ? ` · Try ${w.attempt}` : ""}</p>
-        ${w.feedback ? `<div class="fb ${w.status === "Revise" ? "rev" : ""}"><b>Feedback:</b> ${esc(w.feedback)}</div>` : w.status === "Needs review" ? `<p class="muted">Waiting for your teacher to review it.</p>` : ""}
-        ${open && w.status === "Revise" ? `<div><button class="btn sm" type="button" data-pid="${esc(w.problemId)}">Revise it</button></div>` : ""}
+        <p class="dim">${w.status === "Draft" ? `Saved ${esc(fmtWhen(w.savedAt))} · not turned in yet` : `Turned in ${esc(fmtWhen(w.submitted || w.savedAt))}`}</p>
+        ${w.feedback && w.status !== "Needs review" && w.status !== "Draft" ? `<div class="fb ${w.status === "Revise" ? "rev" : ""}"><b>Feedback:</b> ${esc(w.feedback)}</div>` : w.status === "Needs review" ? `<p class="muted">Waiting for your teacher to review it.</p>` : ""}
+        ${open ? `<div><button class="btn sm ${w.status === "Draft" || w.status === "Revise" ? "" : "ghost"}" type="button" data-pid="${esc(w.problemId)}">${({ Draft: "Keep working", Revise: "Make changes", "Needs review": "View or unsubmit", Reviewed: "View" })[w.status] || "Open"}</button></div>` : ""}
       </section>`; }).join("")}</div>`
-    : `<div class="card empty"><h2>Nothing turned in yet</h2><p style="margin-top:6px">When you turn in a challenge, it shows up here with your score and feedback.</p></div>`}`;
+    : `<div class="card empty"><h2>Nothing here yet</h2><p style="margin-top:6px">Challenges you save or turn in show up here with your score and feedback.</p></div>`}`;
   $$("[data-pid]", app).forEach(b => b.onclick = () => openProblem(b.dataset.pid));
 }
 
 /* ============ TEACHER ============ */
-$("#teacher-link").onclick = () => startTeacher();
+$("#teacher-link").onclick = () => guardLeave(() => startTeacher());
 
 async function startTeacher(){
   $("#teacher-link").hidden = true; $("#foot-who").textContent = "";
@@ -958,7 +1061,7 @@ const probById = id => T().problems.find(p => p.id === id);
 function filteredSubs(){
   const f = S.t.f;
   return T().submissions.filter(s => (!f.pid || s.problemId === f.pid) && (!f.cls || s.cls === f.cls) && (!f.status || s.status === f.status))
-    .sort((a, b) => b.submitted.localeCompare(a.submitted));
+    .sort((a, b) => (b.submitted || b.savedAt).localeCompare(a.submitted || a.savedAt));
 }
 function renderReviewList(){
   const d = T(), f = S.t.f;
@@ -970,11 +1073,11 @@ function renderReviewList(){
     <div class="filters">
       <div class="field"><label class="lbl" for="f-p">Challenge</label><select id="f-p"><option value="">All challenges</option>${probs.map(p => `<option value="${esc(p.id)}" ${p.id === f.pid ? "selected" : ""}>${esc(p.title)}</option>`).join("")}</select></div>
       <div class="field"><label class="lbl" for="f-c">Class</label><select id="f-c"><option value="">All classes</option>${classes.map(c => `<option ${c === f.cls ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
-      <div class="field"><label class="lbl" for="f-s">Status</label><select id="f-s">${[["Needs review","Needs review"],["Revise","Asked to revise"],["Reviewed","Reviewed"],["","Everything"]].map(([v, l]) => `<option value="${v}" ${v === f.status ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+      <div class="field"><label class="lbl" for="f-s">Status</label><select id="f-s">${[["Needs review","Needs review"],["Revise","Sent back for changes"],["Reviewed","Graded"],["Draft","Not turned in yet (drafts)"],["","Everything"]].map(([v, l]) => `<option value="${v}" ${v === f.status ? "selected" : ""}>${l}</option>`).join("")}</select></div>
     </div>
-    ${list.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Student</th><th>Class</th><th>Challenge</th><th>Turned in</th><th>Status</th></tr></thead><tbody>
-      ${list.map(s => `<tr class="click" tabindex="0" data-id="${esc(s.id)}"><td><b>${esc(s.student)}</b>${s.attempt > 1 ? ` <span class="dim">try ${s.attempt}</span>` : ""}</td><td>${esc(s.cls)}</td><td>${esc(s.problem)}</td><td class="num">${esc(fmtWhen(s.submitted))}</td>
-        <td>${s.status === "Reviewed" ? `<span class="pill done">${s.score != null ? s.score + "/" + s.points : "Reviewed"}</span>` : s.status === "Revise" ? `<span class="pill rev">Revise</span>` : `<span class="pill in">Needs review</span>`}</td></tr>`).join("")}
+    ${list.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Student</th><th>Class</th><th>Challenge</th><th>${f.status === "Draft" ? "Last saved" : "Turned in"}</th><th>Status</th></tr></thead><tbody>
+      ${list.map(s => `<tr class="click" tabindex="0" data-id="${esc(s.id)}"><td><b>${esc(s.student)}</b>${s.attempt > 1 ? ` <span class="dim">try ${s.attempt}</span>` : ""}</td><td>${esc(s.cls)}</td><td>${esc(s.problem)}</td><td class="num">${esc(fmtWhen(s.submitted || s.savedAt))}</td>
+        <td>${tPill(s)}</td></tr>`).join("")}
     </tbody></table></div>` : `<div class="card empty"><h2>${f.status === "Needs review" ? "All caught up!" : "Nothing here"}</h2><p style="margin-top:6px">${f.status === "Needs review" ? "No new work is waiting for review." : "No work matches these filters."}</p></div>`}`;
   $("#f-p").onchange = e => { f.pid = e.target.value; renderReviewList(); };
   $("#f-c").onchange = e => { f.cls = e.target.value; renderReviewList(); };
@@ -988,13 +1091,20 @@ function renderReviewList(){
 function downloadCSV(list){
   const cell = v => { const t = String(v == null ? "" : v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
   const head = ["Turned in","Student","Class","Challenge","Try","Status","Score","Out of","Feedback","Typed work"];
-  const rows = list.map(s => [fmtWhen(s.submitted), s.student, s.cls, s.problem, s.attempt, s.status, s.score == null ? "" : s.score, s.points, s.feedback,
+  const rows = list.map(s => [fmtWhen(s.submitted || s.savedAt), s.student, s.cls, s.problem, s.attempt, s.status, s.score == null ? "" : s.score, s.points, s.feedback,
     s.responses.filter(r => (r.text || "").trim()).map(r => (r.part ? r.part + ") " : "") + r.text).join(" | ")]);
   const csv = [head, ...rows].map(r => r.map(cell).join(",")).join("\r\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv" }));
   a.download = "think-bigger-scores-" + todayISO() + ".csv";
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+function tPill(s){
+  if (s.status === "Reviewed") return `<span class="pill done">${s.score != null ? "Graded " + s.score + "/" + s.points : "Graded"}</span>`;
+  if (s.status === "Revise") return `<span class="pill rev">Sent back</span>`;
+  if (s.status === "Draft") return `<span class="pill draft">Draft</span>`;
+  return `<span class="pill in">Needs review</span>`;
 }
 
 /* ---- review one ---- */
@@ -1012,8 +1122,9 @@ function renderReviewOne(){
       ${qi >= 0 ? `<span class="dim">${qi + 1} of ${q.length}</span>` : ""}
       <button class="btn ghost sm" type="button" id="prev" ${prevId ? "" : "disabled"}>Previous</button><button class="btn ghost sm" type="button" id="next" ${nextId ? "" : "disabled"}>Next</button></div>
     <section class="card stack" style="gap:8px">
-      <div class="row"><h2 style="flex:1">${esc(s.student)} <span class="muted" style="font-size:1rem">· ${esc(s.cls)}</span></h2>${s.status === "Reviewed" ? `<span class="pill done">Reviewed</span>` : s.status === "Revise" ? `<span class="pill rev">Asked to revise</span>` : `<span class="pill in">Needs review</span>`}</div>
-      <p><b>${esc(s.problem)}</b> <span class="dim">· turned in ${esc(fmtWhen(s.submitted))}${s.attempt > 1 ? ` · try ${s.attempt}` : ""}</span></p>
+      <div class="row"><h2 style="flex:1">${esc(s.student)} <span class="muted" style="font-size:1rem">· ${esc(s.cls)}</span></h2>${tPill(s)}</div>
+      <p><b>${esc(s.problem)}</b> <span class="dim">· ${s.status === "Draft" ? "last saved " + esc(fmtWhen(s.savedAt)) : "turned in " + esc(fmtWhen(s.submitted))}${s.attempt > 1 ? ` · turned in ${s.attempt} times` : ""}</span></p>
+      ${s.status === "Draft" ? `<div class="note warn">This is a draft. ${esc(s.student.split(/[\s,]+/)[0])} hasn't turned it in yet${s.attempt ? " (they unsubmitted it to make changes)" : ""}, so it can't be graded.</div>` : ""}
       ${s.account ? `<p class="dim">Google account used: ${esc(s.account)}</p>` : ""}
       ${p ? `<details><summary style="cursor:pointer;font-weight:800;color:var(--violet-d)">Show the challenge</summary><div class="prompt" style="margin-top:10px">${md(p.prompt)}</div></details>` : `<p class="dim">This challenge was deleted.</p>`}
     </section>
@@ -1025,17 +1136,18 @@ function renderReviewOne(){
           : `<p class="dim">Loading pictures…</p>`) : ""}
         ${!r.text && !r.drawing && !r.photos ? `<p class="dim">No work for this part.</p>` : ""}
       </section>`).join("")}
-    <section class="card stack" style="gap:12px">
+    ${s.status === "Draft" ? "" : `<section class="card stack" style="gap:12px">
       <h3>Your review</h3>
+      <p class="dim"><b>Grade it</b> locks the work so it can't be changed. <b>Send back for changes</b> unlocks it so the student can edit and turn it in again.</p>
       <div class="row" style="align-items:flex-end">
         <div class="field" style="width:130px"><label class="lbl" for="rv-s">Score</label><div class="row" style="flex-wrap:nowrap;gap:6px"><input type="number" id="rv-s" min="0" step="0.5" value="${s.score != null ? s.score : ""}"><span class="muted" style="white-space:nowrap">/ ${s.points}</span></div></div>
-        <div class="field"><span class="lbl">Result</span><div class="seg" role="group" aria-label="Result"><button type="button" data-st="Reviewed">Done</button><button type="button" data-st="Revise">Ask to revise</button></div></div>
+        <div class="field"><span class="lbl">Result</span><div class="seg" role="group" aria-label="Result"><button type="button" data-st="Reviewed">Grade it</button><button type="button" data-st="Revise">Send back for changes</button></div></div>
       </div>
       <div class="field"><label class="lbl" for="rv-f">Feedback for the student</label>
         <div class="chips" style="margin-bottom:8px">${QUICK.map(c => `<button type="button" class="chip" data-q="${esc(c)}">${esc(c)}</button>`).join("")}</div>
         <textarea id="rv-f" style="min-height:90px">${esc(s.feedback)}</textarea></div>
       <div class="row"><button class="btn" type="button" id="rv-next">${nextId ? "Save & next" : "Save"}</button>${nextId ? `<button class="btn ghost" type="button" id="rv-save">Save</button>` : ""}<span class="err" id="rv-e" role="alert"></span></div>
-    </section>`;
+    </section>`}`;
   typeset(app);
   let st = s.status === "Revise" ? "Revise" : "Reviewed";
   const segs = $$(".seg button"); const paint = () => segs.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.st === st)));
@@ -1055,7 +1167,7 @@ function renderReviewOne(){
       toast("Saved"); tNav(); then();
     } catch (e){ $("#rv-e").textContent = errMsg(e); btns.forEach(b => b.disabled = false); }
   };
-  $("#rv-next").onclick = () => save(() => nextId ? go(nextId) : renderReviewOne());
+  if ($("#rv-next")) $("#rv-next").onclick = () => save(() => nextId ? go(nextId) : renderReviewOne());
   if ($("#rv-save")) $("#rv-save").onclick = () => save(() => renderReviewOne());
   if (!imgs && s.responses.some(r => r.drawing || r.photos)){
     api("getSubmissionImages", S.t.pass, s.id).then(x => { S.t.imgs[s.id] = x; if (S.t.subId === s.id) renderReviewOne(); })
