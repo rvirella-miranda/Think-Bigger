@@ -22,7 +22,7 @@ window.THINK_BIGGER_CONFIG = {
 <title>Think Bigger · Extra Credit</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Luckiest+Guy&family=Nunito:wght@400;600;700;800&display=swap">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -33,6 +33,7 @@ window.THINK_BIGGER_CONFIG = {
   --pink:#ffd3ef; --lav:#e3dbff; --sky:#d3efff; --mint:#ccf5e4; --butter:#fff1b8; --peach:#ffdcc8; --teal:#c9f1f1; --rose:#ffd6dc;
   --good:#16794a; --good-bg:#dcf7e9; --warn:#a24a00; --warn-bg:#ffe9d6; --bad:#b4233a; --bad-bg:#ffe1e6;
   --display:"Fredoka", "Nunito", system-ui, sans-serif;
+  --heading:"Luckiest Guy", "Fredoka", system-ui, sans-serif;
   --body:"Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
   --r:16px;
 }
@@ -44,8 +45,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:3px solid var(--violet);outline-offset:2px}
 h1,h2,h3{font-family:var(--display);font-weight:600;line-height:1.2;margin:0;text-wrap:balance}
-h1{font-size:clamp(1.6rem,4vw,2.2rem)}
-h2{font-size:1.35rem}
+h1,h2{font-family:var(--heading);font-weight:400;letter-spacing:.03em;line-height:1.15}
+h1{font-size:clamp(1.9rem,4.6vw,2.6rem);padding-top:.12em}
+h2{font-size:1.5rem;padding-top:.1em}
 h3{font-size:1.1rem}
 p{margin:0}
 a{color:var(--violet-d)}
@@ -118,7 +120,7 @@ textarea{resize:vertical;min-height:120px;line-height:1.5}
 /* board */
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 16px}
-.stat b{display:block;font-family:var(--display);font-size:1.7rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat b{display:block;font-family:var(--heading);font-weight:400;letter-spacing:.03em;font-size:1.7rem;line-height:1.1;font-variant-numeric:tabular-nums}
 .stat span{color:var(--muted);font-size:.85rem;font-weight:700}
 .week h2{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .week h2 small{font-family:var(--body);font-size:.9rem;color:var(--dim);font-weight:700}
