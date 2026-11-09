@@ -14,6 +14,12 @@ window.THINK_BIGGER_CONFIG = {
   supabaseUrl: "https://iitromaezynmfduxhxkq.supabase.co",        // looks like https://abcdefghijk.supabase.co
   supabaseKey: "sb_publishable_Chc2NWe0ky-zbpnVuYvE2A_rjX6t9Y1",    // starts with sb_publishable_ or eyJ...
 
+  // Answer keys (private Claude docs). Shown only on the teacher side.
+  answerKeys: {
+    "Pre-Algebra": "https://claude.ai/artifact/1MF99WvYZkxzVrpiGd1qZ2",
+    "Algebra 1": "https://claude.ai/artifact/19dmvaSn9Emcwe4u6VLwA7"
+  },
+
   siteTitle: "Think Bigger",
   siteSubtitle: "Extra credit challenges · Mrs. Miranda's math classes"
 };
@@ -251,6 +257,7 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.93rem}
 .bulk.on{border:1px solid var(--violet);background:var(--violet-l);color:var(--ink)}
 .tbl tr.selrow td{background:#f6f3ff}
 .tbl input[type=checkbox]{width:18px;height:18px;accent-color:var(--violet)}
+.keybtn::before{content:"";display:inline-block;width:14px;height:14px;margin-right:2px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27black%27 stroke-width=%272.4%27 stroke-linecap=%27round%27%3E%3Ccircle cx=%277.5%27 cy=%2715.5%27 r=%274.5%27/%3E%3Cpath d=%27M10.5 12.5 20 3m-4 4 3 3m-6 0 2 2%27/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27black%27 stroke-width=%272.4%27 stroke-linecap=%27round%27%3E%3Ccircle cx=%277.5%27 cy=%2715.5%27 r=%274.5%27/%3E%3Cpath d=%27M10.5 12.5 20 3m-4 4 3 3m-6 0 2 2%27/%3E%3C/svg%3E") center/contain no-repeat}
 footer.foot{text-align:center;padding:20px 16px 30px;color:var(--dim);font-size:.85rem}
 </style>
 </head>
@@ -473,6 +480,9 @@ const COURSES = {
 const COURSE_NAMES = Object.keys(COURSES);
 const normCourse = s => { const t = String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); return /^prealg/.test(t) ? "Pre-Algebra" : /^alg(ebra)?(1|i|one)?$/.test(t) ? "Algebra 1" : ""; };
 const cVars = c => COURSES[c] ? `--cc:${COURSES[c].color};--cb:${COURSES[c].bg}` : "";
+const KEYS = (window.THINK_BIGGER_CONFIG && window.THINK_BIGGER_CONFIG.answerKeys) || {};
+const keyUrl = c => (/^https:\/\//.test(KEYS[c] || "") ? KEYS[c] : "");
+const keyLink = (c, label, cls) => keyUrl(c) ? `<a class="${cls || "btn ghost sm"}" href="${esc(keyUrl(c))}" target="_blank" rel="noopener">${esc(label || "Answer key")}</a>` : "";
 const coursePill = c => COURSES[c] ? `<span class="cpill" style="${cVars(c)}">${esc(c)}</span>` : "";
 const unitList = s => String(s || "").split(/[,;\s]+/).map(x => parseInt(x, 10)).filter(n => n >= 1 && n <= 20);
 const unitLabel = s => { const u = unitList(s); return u.length ? (u.length === 1 ? "Unit " : "Units ") + u.join(" + ") : ""; };
@@ -1156,6 +1166,7 @@ function renderReviewOne(){
       <p><b>${esc(s.problem)}</b> <span class="dim">· ${s.status === "Draft" ? "last saved " + esc(fmtWhen(s.savedAt)) : "turned in " + esc(fmtWhen(s.submitted))}${s.attempt > 1 ? ` · turned in ${s.attempt} times` : ""}</span></p>
       ${s.status === "Draft" ? `<div class="note warn">This is a draft. ${esc(s.student.split(/[\s,]+/)[0])} hasn't turned it in yet${s.attempt ? " (they unsubmitted it to make changes)" : ""}, so it can't be graded.</div>` : ""}
       ${s.account ? `<p class="dim">Google account used: ${esc(s.account)}</p>` : ""}
+      ${p && keyUrl(p.course) ? `<div class="row">${keyLink(p.course, "Open the " + p.course + " answer key")}<span class="dim">Find “${esc(p.title)}” in the key.</span></div>` : ""}
       ${p ? `<details><summary style="cursor:pointer;font-weight:800;color:var(--violet-d)">Show the challenge</summary><div class="prompt" style="margin-top:10px">${md(p.prompt)}</div></details>` : `<p class="dim">This challenge was deleted.</p>`}
     </section>
     ${s.responses.map((r, i) => `
@@ -1220,7 +1231,7 @@ function renderChallenges(){
   const filters = [["", "All", all.length], ...COURSE_NAMES.map(c => [c, c, n(c)]), ...(n("none") ? [["none", "No course", n("none")]] : [])];
   const allOn = probs.length > 0 && probs.every(p => sel.has(p.id));
   app.innerHTML = `
-    <div class="row"><h2 style="flex:1">Challenges</h2><button class="btn ghost" type="button" id="imp">Paste from Claude</button><button class="btn" type="button" id="new">+ New challenge</button></div>
+    <div class="row"><h2 style="flex:1">Challenges</h2>${COURSE_NAMES.map(c => keyLink(c, c + " key", "btn ghost keybtn")).join("")}<button class="btn ghost" type="button" id="imp">Paste from Claude</button><button class="btn" type="button" id="new">+ New challenge</button></div>
     <div class="chips" role="group" aria-label="Show challenges for">${filters.map(([k, l, c]) => `<button type="button" class="chip ${COURSES[k] ? "cchip" : ""}" style="${cVars(k)}" data-f="${esc(k)}" aria-pressed="${f === k}">${esc(l)} <span class="dim">${c}</span></button>`).join("")}</div>
     <div class="bulk ${sel.size ? "on" : ""}" id="bulk">
       <b>${sel.size ? `${sel.size} selected` : "Check challenges to change several at once"}</b>
@@ -1238,7 +1249,7 @@ function renderChallenges(){
         <td>${p.classes.length ? p.classes.map(cl => `<span class="cpill ${classCourse(cl) ? "" : "plain"}" style="${cVars(classCourse(cl))}">${esc(cl)}</span>`).join(" ") : `<span class="dim">All</span>`}</td>
         <td>${shown(p)}</td>
         <td class="num">${c.all}${c.todo ? ` <span class="pill in">${c.todo} new</span>` : ""}</td>
-        <td><div class="row" style="flex-wrap:nowrap;gap:6px"><button class="btn ghost sm" type="button" data-edit="${esc(p.id)}">Edit</button><button class="btn ghost sm" type="button" data-tog="${esc(p.id)}">${p.status === "Visible" ? "Hide" : "Show"}</button></div></td></tr>`; }).join("")}
+        <td><div class="row" style="flex-wrap:nowrap;gap:6px">${keyLink(p.course, "Key")}<button class="btn ghost sm" type="button" data-edit="${esc(p.id)}">Edit</button><button class="btn ghost sm" type="button" data-tog="${esc(p.id)}">${p.status === "Visible" ? "Hide" : "Show"}</button></div></td></tr>`; }).join("")}
     </tbody></table></div>` : `<div class="card empty"><h2>No challenges ${f ? "here" : "yet"}</h2><p style="margin-top:6px">Add one yourself, or paste a week of challenges from Claude.</p></div>`}`;
   $$("[data-f]").forEach(b => b.onclick = () => { S.t.cf = b.dataset.f; renderChallenges(); });
   $("#new").onclick = () => { const course = COURSES[f] ? f : ""; S.t.edit = { id: "", status: "Visible", postDate: today, dueDate: "", title: "", type: TYPES[0][0], course, units: "", topics: "", points: 5, classes: course ? classOptions().filter(c => classCourse(c) === course) : [], prompt: "", parts: ["", ""], image: undefined, hasImage: false }; renderTeacher(); };
@@ -1290,7 +1301,7 @@ function renderEditor(){
     <section class="card stack">
       <h2>${isNew ? "New challenge" : "Edit challenge"}</h2>
       <div class="field"><label class="lbl" for="e-title">Title</label><input type="text" id="e-title" value="${esc(e.title)}" maxlength="200" placeholder="e.g. The Gym Membership Decision"></div>
-      <div class="field"><span class="lbl">Course</span><div class="seg cseg" id="e-course" role="group" aria-label="Course">${COURSE_NAMES.map(c => `<button type="button" data-course="${esc(c)}" style="${cVars(c)}">${esc(c)}</button>`).join("")}</div></div>
+      <div class="field"><span class="lbl">Course</span><div class="row"><div class="seg cseg" id="e-course" role="group" aria-label="Course">${COURSE_NAMES.map(c => `<button type="button" data-course="${esc(c)}" style="${cVars(c)}">${esc(c)}</button>`).join("")}</div><span id="e-key">${keyLink(e.course)}</span></div></div>
       <div class="grid3">
         <div class="field"><label class="lbl" for="e-type">Type</label><select id="e-type">${TYPES.map(([t]) => `<option ${t === e.type ? "selected" : ""}>${esc(t)}</option>`).join("")}${e.type && !TYPES.some(([t]) => t === e.type) ? `<option selected>${esc(e.type)}</option>` : ""}</select></div>
         <div class="field"><label class="lbl" for="e-pts">Points</label><input type="number" id="e-pts" min="0" value="${esc(e.points)}"></div>
@@ -1316,7 +1327,7 @@ function renderEditor(){
     e.postDate = $("#e-post").value; e.dueDate = $("#e-due").value; e.topics = $("#e-topics").value; e.prompt = $("#e-prompt").value;
     e.parts = $$("#e-parts textarea").map(t => t.value);
   };
-  const drawCourse = () => $$("#e-course button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.course === e.course)));
+  const drawCourse = () => { $$("#e-course button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.course === e.course))); const k = $("#e-key"); if (k) k.innerHTML = keyLink(e.course); };
   const drawUnits = () => {
     const box = $("#e-units"), u = unitList(e.units);
     if (!COURSES[e.course]){ box.innerHTML = `<p class="dim">Pick a course above to see its units.</p>`; return; }
