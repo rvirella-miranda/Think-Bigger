@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>
+/* =====================================================================
+   SETTINGS: paste your two Supabase values here, then commit.
+   ===================================================================== */
+// Paste your two Supabase values below (Supabase → Project Settings → API Keys / Data API).
+// The publishable ("anon") key is safe to put on a public website: the database rules
+// in supabase-setup.sql decide what students can see and do.
+
+window.THINK_BIGGER_CONFIG = {
+  supabaseUrl: "PASTE_YOUR_PROJECT_URL_HERE",        // looks like https://abcdefghijk.supabase.co
+  supabaseKey: "PASTE_YOUR_PUBLISHABLE_KEY_HERE",    // starts with sb_publishable_ or eyJ...
+
+  siteTitle: "Think Bigger",
+  siteSubtitle: "Extra credit challenges · Mrs. Miranda's math classes"
+};
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Think Bigger · Extra Credit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<style>
+:root{
+  --bg:#faf7ff; --card:#ffffff; --ink:#1d1638; --muted:#5d5878; --dim:#8b86a6; --line:#e6e0f5;
+  --violet:#6b4ce6; --violet-d:#4f33c4; --violet-l:#efeaff;
+  --pink:#ffd3ef; --lav:#e3dbff; --sky:#d3efff; --mint:#ccf5e4; --butter:#fff1b8; --peach:#ffdcc8; --teal:#c9f1f1; --rose:#ffd6dc;
+  --good:#16794a; --good-bg:#dcf7e9; --warn:#a24a00; --warn-bg:#ffe9d6; --bad:#b4233a; --bad-bg:#ffe1e6;
+  --display:"Fredoka", "Nunito", system-ui, sans-serif;
+  --body:"Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r:16px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font-family:var(--body);font-size:16px;line-height:1.5;min-height:100vh}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--violet);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);font-weight:600;line-height:1.2;margin:0;text-wrap:balance}
+h1{font-size:clamp(1.6rem,4vw,2.2rem)}
+h2{font-size:1.35rem}
+h3{font-size:1.1rem}
+p{margin:0}
+a{color:var(--violet-d)}
+.wrap{max-width:1040px;margin:0 auto;padding:16px 16px 48px}
+.stack{display:flex;flex-direction:column;gap:16px}
+.stack>*{min-width:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.spacer{flex:1}
+
+/* header */
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:6px 0 18px}
+.logo{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#b9a6ff,#ff9fd8);display:grid;place-items:center;flex:none;box-shadow:0 4px 0 #8f78e8}
+.logo svg{width:30px;height:30px}
+.brand{min-width:0}
+.brand .sub{color:var(--muted);font-size:.95rem}
+.nav{display:flex;gap:4px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:4px;margin-left:auto;flex-wrap:wrap}
+.nav button{border:0;background:none;border-radius:9px;padding:7px 14px;font-weight:800;color:var(--muted)}
+.nav button[aria-current="page"]{background:var(--violet-l);color:var(--violet-d)}
+.nav .count{display:inline-block;min-width:1.5em;padding:0 6px;margin-left:6px;border-radius:99px;background:var(--violet);color:#fff;font-size:.75rem;line-height:1.5em}
+.who{display:flex;align-items:center;gap:8px;font-weight:700;color:var(--muted);font-size:.92rem}
+
+/* cards & controls */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;box-shadow:0 1px 0 rgba(60,40,120,.04)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;padding:11px 18px;font-weight:800;background:var(--violet);color:#fff;box-shadow:0 3px 0 var(--violet-d);text-decoration:none;white-space:nowrap}
+.btn:hover{filter:brightness(1.05)}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--violet-d)}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:0 2px 0 var(--line)}
+.btn.danger{background:#fff;color:var(--bad);border:1px solid #f3c3cc;box-shadow:0 2px 0 #f3c3cc}
+.btn.sm{padding:6px 12px;font-size:.88rem;border-radius:10px}
+.btn.big{padding:14px 26px;font-size:1.08rem}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.link{background:none;border:0;padding:0;color:var(--violet-d);font-weight:800;text-decoration:underline;text-underline-offset:3px}
+label.lbl,.lbl{display:block;font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;font-weight:800;color:var(--muted);margin-bottom:5px}
+input[type=text],input[type=number],input[type=date],input[type=password],select,textarea{width:100%;background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(107,76,230,.15)}
+textarea{resize:vertical;min-height:120px;line-height:1.5}
+.field{min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:640px){.grid2,.grid3{grid-template-columns:minmax(0,1fr)}}
+.muted{color:var(--muted)}
+.dim{color:var(--dim);font-size:.9rem}
+.err{color:var(--bad);font-weight:700}
+.note{background:var(--violet-l);border-radius:12px;padding:12px 14px;color:var(--ink);font-size:.95rem}
+.note.warn{background:var(--warn-bg)}
+
+/* pills & badges */
+.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font-size:.78rem;font-weight:800;background:var(--lav);color:var(--ink);white-space:nowrap}
+.pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:.8rem;font-weight:800;white-space:nowrap}
+.pill.todo{background:#f1eff7;color:var(--muted)}
+.pill.in{background:var(--lav);color:#432aa8}
+.pill.done{background:var(--good-bg);color:var(--good)}
+.pill.rev{background:var(--warn-bg);color:var(--warn)}
+.pill.hid{background:#f1eff7;color:var(--muted)}
+.pill.vis{background:var(--good-bg);color:var(--good)}
+.pill.late{background:var(--bad-bg);color:var(--bad)}
+
+/* sign in */
+.hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:24px;align-items:center}
+@media (max-width:760px){.hero{grid-template-columns:minmax(0,1fr)}}
+.hero-art{background:linear-gradient(160deg,var(--lav),var(--pink));border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:10px}
+.hero-art .step{display:flex;gap:12px;align-items:flex-start;background:rgba(255,255,255,.75);border-radius:14px;padding:10px 14px}
+.hero-art .n{font-family:var(--display);font-weight:700;color:var(--violet-d);font-size:1.2rem;min-width:1.2em}
+
+/* board */
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 16px}
+.stat b{display:block;font-family:var(--display);font-size:1.7rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:.85rem;font-weight:700}
+.week h2{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.week h2 small{font-family:var(--body);font-size:.9rem;color:var(--dim);font-weight:700}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.pcard{--tc:var(--lav);text-align:left;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:0;overflow:hidden;display:flex;flex-direction:column;transition:transform .12s,box-shadow .12s}
+.pcard:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(60,40,120,.08)}
+.pcard .band{background:var(--tc);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pcard .band .t{font-weight:800;font-size:.85rem}
+.pcard .band .pts{font-family:var(--display);font-weight:600}
+.pcard .body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+.pcard .ttl{font-family:var(--display);font-weight:600;font-size:1.15rem;line-height:1.25}
+.pcard .meta{color:var(--muted);font-size:.88rem}
+.pcard .foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto;padding-top:6px;flex-wrap:wrap}
+@media (prefers-reduced-motion:reduce){.pcard{transition:none}.pcard:hover{transform:none}}
+.empty{text-align:center;padding:36px 20px;color:var(--muted)}
+
+/* problem */
+.phead{display:flex;flex-direction:column;gap:8px}
+.prompt{font-size:1.05rem;display:flex;flex-direction:column;gap:12px;overflow-wrap:anywhere}
+.prompt p+p{margin-top:0}
+.prompt ul{margin:0;padding-left:1.3em}
+.prompt img{max-width:100%;border-radius:12px;border:1px solid var(--line)}
+.mdtable{overflow-x:auto}
+.mdtable table{border-collapse:collapse;min-width:50%}
+.mdtable th,.mdtable td{border:1px solid var(--line);padding:6px 12px;text-align:left}
+.mdtable th{background:var(--violet-l);font-weight:800}
+.part{display:flex;flex-direction:column;gap:12px}
+.part-h{display:flex;gap:12px;align-items:flex-start}
+.part-l{flex:none;width:34px;height:34px;border-radius:10px;background:var(--violet);color:#fff;font-family:var(--display);font-weight:700;display:grid;place-items:center;font-size:1.05rem}
+.part-q{flex:1;min-width:0;padding-top:4px;font-weight:700;overflow-wrap:anywhere}
+.part-q p{margin:0}
+.wtabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:2px solid var(--line);padding-bottom:0}
+.wtab{border:0;background:none;padding:8px 14px;border-radius:10px 10px 0 0;font-weight:800;color:var(--muted);position:relative;margin-bottom:-2px;border-bottom:3px solid transparent}
+.wtab[aria-selected="true"]{color:var(--violet-d);border-bottom-color:var(--violet);background:var(--violet-l)}
+.wtab .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--good);margin-left:6px;vertical-align:middle}
+.mkeys{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+.mkey{border:1px solid var(--line);background:#fff;border-radius:8px;min-width:38px;padding:4px 8px;font-weight:700}
+.mkey:hover{border-color:var(--violet)}
+
+/* drawing pad */
+.pad-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.tg{display:flex;gap:4px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:3px}
+.tb{border:0;background:none;border-radius:7px;padding:5px 10px;font-weight:800;font-size:.88rem;color:var(--ink)}
+.tb[aria-pressed="true"]{background:var(--violet-l);color:var(--violet-d)}
+.tb:disabled{opacity:.35;cursor:default}
+.sw{width:28px;height:28px;border-radius:50%;border:3px solid #fff;background:var(--sw);box-shadow:0 0 0 1px var(--line);padding:0}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 2px var(--violet)}
+.pad-wrap{position:relative;width:100%;border:2px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.pad-wrap canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.pad-ink{touch-action:none;cursor:crosshair}
+.pad-foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
+
+/* photos */
+.phs{display:flex;gap:10px;flex-wrap:wrap}
+.ph{position:relative;width:150px;height:150px;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#f4f2fa}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph button{position:absolute;top:6px;right:6px;border:0;border-radius:99px;background:rgba(29,22,56,.8);color:#fff;font-weight:800;padding:2px 9px}
+.addph{width:150px;height:150px;border:2px dashed #cfc6ef;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--violet-d);font-weight:800;cursor:pointer;text-align:center;padding:10px}
+.addph:hover{background:var(--violet-l)}
+
+/* turn in bar */
+.turnin{position:sticky;bottom:0;background:rgba(250,247,255,.94);backdrop-filter:blur(4px);border-top:1px solid var(--line);padding:12px 0;display:flex;gap:12px;align-items:center;flex-wrap:wrap;z-index:5}
+
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(29,22,56,.45);display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto;z-index:50}
+.mbox{background:#fff;border-radius:18px;width:min(620px,100%);padding:22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(29,22,56,.3);margin:auto 0}
+.mbox.wide{width:min(900px,100%)}
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.checks li{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;background:#f6f4fc}
+.checks .ok{color:var(--good);font-weight:800}
+.checks .no{color:var(--warn);font-weight:800}
+.bigcheck{width:80px;height:80px;border-radius:50%;background:var(--good-bg);display:grid;place-items:center;margin:0 auto}
+.spin{width:40px;height:40px;border:4px solid var(--lav);border-top-color:var(--violet);border-radius:50%;animation:sp 1s linear infinite;margin:0 auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:12px;font-weight:700;z-index:60;max-width:calc(100% - 32px)}
+.toast.bad{background:var(--bad)}
+
+/* work list */
+.wlist{display:flex;flex-direction:column;gap:12px}
+.witem{display:flex;flex-direction:column;gap:8px}
+.fb{background:var(--good-bg);border-radius:12px;padding:10px 14px;white-space:pre-wrap}
+.fb.rev{background:var(--warn-bg)}
+
+/* teacher */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:#fff}
+table.tbl{border-collapse:collapse;width:100%;font-size:.93rem}
+.tbl th,.tbl td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+.tbl th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:#fbfaff;white-space:nowrap}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tr.click{cursor:pointer}
+.tbl tr.click:hover td{background:#faf8ff}
+.tbl td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl input{padding:6px 8px;border-radius:8px}
+.filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:640px){.filters{grid-template-columns:minmax(0,1fr)}}
+.resp{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--line);border-radius:14px}
+.resp .txt{white-space:pre-wrap;background:#f6f4fc;border-radius:10px;padding:10px 12px;overflow-wrap:anywhere}
+.resp img{max-width:100%;border:1px solid var(--line);border-radius:10px;cursor:zoom-in;background:#fff}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:#fff;border-radius:99px;padding:4px 12px;font-size:.85rem;font-weight:700}
+.chip:hover{border-color:var(--violet)}
+.chip[aria-pressed="true"]{background:var(--violet-l);border-color:var(--violet);color:var(--violet-d)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.seg button{border:0;background:none;padding:8px 14px;font-weight:800;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--violet);color:#fff}
+.partedit{display:flex;gap:8px;align-items:flex-start}
+.partedit textarea{min-height:60px}
+.imgprev{max-width:260px;border-radius:10px;border:1px solid var(--line);display:block}
+.pv{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.fmt{background:#f6f4fc;border-radius:10px;padding:12px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.82rem;white-space:pre-wrap;overflow-x:auto}
+@media (max-width:640px){
+  .turnin{padding:8px 0}
+  .turnin .btn.big{padding:10px 20px;font-size:1rem}
+  #draft-note{display:none}
+  .logo{width:40px;height:40px;border-radius:12px}
+  .logo svg{width:24px;height:24px}
+  .top{gap:10px;padding-bottom:12px}
+  .nav{margin-left:0;width:100%}
+  .card{padding:16px}
+}
+footer.foot{text-align:center;padding:20px 16px 30px;color:var(--dim);font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 32 32" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 25h8M13 29h6"/><path d="M16 3a9 9 0 0 0-5.5 16.1c.9.7 1.5 1.8 1.5 2.9h8c0-1.1.6-2.2 1.5-2.9A9 9 0 0 0 16 3z"/><path d="M13 14l3 3 3-3"/></svg>
+    </div>
+    <div class="brand">
+      <h1 id="site-title">Think Bigger</h1>
+      <p class="sub" id="site-sub">Extra credit challenges</p>
+    </div>
+    <nav class="nav" id="nav" hidden></nav>
+  </header>
+  <main id="app" class="stack" aria-live="polite">
+    <div class="card empty"><div class="spin" aria-hidden="true"></div><p style="margin-top:12px">Loading challenges…</p></div>
+  </main>
+</div>
+<footer class="foot"><span id="foot-who"></span> <button class="link" id="teacher-link" type="button">Teacher</button></footer>
+<div id="modal-root"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+(() => {
+"use strict";
+
+/* ============ basics ============ */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const app = $("#app");
+const ss = {
+  get(k){ try { return JSON.parse(sessionStorage.getItem(k)); } catch { return null; } },
+  set(k,v){ try { sessionStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k){ try { sessionStorage.removeItem(k); } catch {} }
+};
+/* ============ Supabase data layer ============ */
+const CFG = window.THINK_BIGGER_CONFIG || {};
+const configured = CFG.supabaseUrl && CFG.supabaseKey && !/PASTE/i.test(CFG.supabaseUrl + CFG.supabaseKey) && window.supabase;
+const sb = configured ? window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey) : null;
+const START_VIEW = /(^|[?&#])(view=)?teacher\b/.test(location.search + location.hash) ? "teacher" : "student";
+const IMG = {};   // problem id -> picture path
+const RAW = {};   // submission id -> stored responses (with file paths)
+const unwrap = ({ data, error }) => { if (error) throw new Error(error.message || "Something went wrong."); return data; };
+const rpcOk = d => { if (d && d.error) throw new Error(d.error); return d; };
+const rowToProblem = r => { IMG[r.id] = r.image_path || null; return {
+  id: r.id, status: r.status, postDate: r.post_date || "", dueDate: r.due_date || "", title: r.title || "", type: r.type || "",
+  units: r.units || "", topics: r.topics || "", points: Number(r.points) || 0, classes: r.classes || [], prompt: r.prompt || "",
+  parts: Array.isArray(r.parts) ? r.parts : [], hasImage: !!r.image_path }; };
+function dataUrlToBlob(u){
+  const m = /^data:([^;]+);base64,(.*)$/.exec(u); const bin = atob(m[2]); const a = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+  return new Blob([a], { type: m[1] });
+}
+const newId = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)).replace(/[^0-9a-zA-Z-]/g, "");
+async function uploadImage(bucket, folder, dataUrl){
+  const blob = dataUrlToBlob(dataUrl);
+  const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
+  const path = `${folder}/${newId()}.${ext}`;
+  unwrap(await sb.storage.from(bucket).upload(path, blob, { contentType: blob.type, upsert: false }));
+  return path;
+}
+const cleanDate = s => { s = String(s || "").trim(); if (s && !/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new Error("Dates must look like 2026-11-09."); return s || null; };
+const API = {
+  async getStudentData(){
+    const [roster, problems, today] = await Promise.all([
+      sb.rpc("student_roster").then(unwrap), sb.from("problems").select("*").then(unwrap), sb.rpc("local_today").then(unwrap)]);
+    return { title: CFG.siteTitle, subtitle: CFG.siteSubtitle, today,
+      roster: roster.map(r => ({ name: r.name, cls: r.cls, pin: r.has_pin })),
+      problems: problems.map(rowToProblem).filter(p => p.status === "Visible" && (!p.postDate || p.postDate <= today)) };
+  },
+  async checkStudent(name, cls, pin){ return rpcOk(unwrap(await sb.rpc("check_student", { p_name: name, p_cls: cls, p_pin: pin || "" }))); },
+  async getMyWork(name, cls, pin){ return (await API.checkStudent(name, cls, pin)).work; },
+  async getProblemImage(id){ const p = IMG[id]; return p ? sb.storage.from("pictures").getPublicUrl(p).data.publicUrl : null; },
+  async submitWork(x){
+    const responses = [];
+    for (const r of x.responses){
+      responses.push({ part: r.part, text: r.text,
+        drawing: r.drawing ? await uploadImage("work", "submissions", r.drawing) : null,
+        photos: await Promise.all((r.photos || []).map(ph => uploadImage("work", "submissions", ph))) });
+    }
+    return rpcOk(unwrap(await sb.rpc("submit_work", { p_name: x.name, p_cls: x.cls, p_pin: x.pin || "", p_problem: x.problemId, p_responses: responses })));
+  },
+  async teacherSession(){
+    const { data } = await sb.auth.getSession();
+    if (!data || !data.session) return null;
+    const ok = unwrap(await sb.rpc("is_teacher"));
+    return ok ? data.session.user.email : false;
+  },
+  async teacherSignIn(email, password){
+    unwrap(await sb.auth.signInWithPassword({ email, password }));
+    const ok = unwrap(await sb.rpc("is_teacher"));
+    if (!ok){ await sb.auth.signOut(); throw new Error("That account isn't set up as a teacher. Check the email in the setup script."); }
+    return true;
+  },
+  async teacherSignOut(){ await sb.auth.signOut(); },
+  async teacherData(){
+    const [roster, problems, subs, today] = await Promise.all([
+      sb.from("roster").select("*").order("cls").order("name").then(unwrap),
+      sb.from("problems").select("*").then(unwrap),
+      sb.from("submissions").select("*").order("submitted_at", { ascending: false }).then(unwrap),
+      sb.rpc("local_today").then(unwrap)]);
+    return { today,
+      roster: roster.map(r => ({ name: r.name, cls: r.cls, pin: r.pin, active: r.active })),
+      problems: problems.map(rowToProblem),
+      submissions: subs.map(s => { RAW[s.id] = s.responses || []; return {
+        id: s.id, submitted: s.submitted_at, student: s.student, cls: s.cls, problemId: s.problem_id || "", problem: s.problem_title,
+        attempt: s.attempt, status: s.status, score: s.score == null ? null : Number(s.score), points: Number(s.points) || 0,
+        feedback: s.feedback || "", reviewed: s.reviewed_at || "",
+        responses: (s.responses || []).map(r => ({ part: r.part, text: r.text, drawing: !!r.drawing, photos: (r.photos || []).length })) }; }) };
+  },
+  async getSubmissionImages(_, id){
+    const resp = RAW[id] || [];
+    const paths = resp.flatMap(r => [r.drawing, ...(r.photos || [])]).filter(Boolean);
+    const urls = {};
+    if (paths.length){
+      const signed = unwrap(await sb.storage.from("work").createSignedUrls(paths, 3600));
+      signed.forEach(s => { if (s.signedUrl) urls[s.path] = s.signedUrl; });
+    }
+    return resp.map(r => ({ drawing: r.drawing ? urls[r.drawing] || null : null, photos: (r.photos || []).map(p => urls[p]).filter(Boolean) }));
+  },
+  async saveReview(_, id, rv){
+    unwrap(await sb.from("submissions").update({ status: rv.status, score: rv.score === "" ? null : rv.score, feedback: rv.feedback || "", reviewed_at: new Date().toISOString() }).eq("id", id));
+    return true;
+  },
+  async saveProblem(_, p){
+    const title = String(p.title || "").trim(); if (!title) throw new Error("Every challenge needs a title.");
+    const row = { status: p.status === "Visible" ? "Visible" : "Hidden", post_date: cleanDate(p.postDate), due_date: cleanDate(p.dueDate),
+      title, type: p.type || "", units: p.units || "", topics: p.topics || "", points: Math.max(0, Number(p.points) || 0),
+      classes: Array.isArray(p.classes) ? p.classes : [], prompt: p.prompt || "",
+      parts: (p.parts || []).map(x => String(x || "").trim()).filter(Boolean), updated_at: new Date().toISOString() };
+    if (p.image === null) row.image_path = null;
+    else if (typeof p.image === "string" && p.image.startsWith("data:")) row.image_path = await uploadImage("pictures", "challenges", p.image);
+    if (p.id){ unwrap(await sb.from("problems").update(row).eq("id", p.id)); return p.id; }
+    return unwrap(await sb.from("problems").insert(row).select("id").single()).id;
+  },
+  async importProblems(_, list){ const ids = []; for (const p of list) ids.push(await API.saveProblem(_, p)); return ids; },
+  async setProblemStatus(_, id, status){ unwrap(await sb.from("problems").update({ status, updated_at: new Date().toISOString() }).eq("id", id)); return true; },
+  async deleteProblem(_, id){ unwrap(await sb.from("problems").delete().eq("id", id)); return true; },
+  async saveRoster(_, rows){ return unwrap(await sb.rpc("replace_roster", { p_rows: rows.map(r => ({ name: r.name, cls: r.cls, pin: String(r.pin || ""), active: r.active !== false })) })); }
+};
+async function api(fn, ...args){
+  if (!sb) throw new Error("This site isn't connected to its database yet. (Teacher: fill in config.js.)");
+  return API[fn](...args);
+}
+const errMsg = e => String((e && e.message) || e || "Something went wrong.").replace(/^(Exception|Error):\s*/, "");
+let toastT;
+function toast(msg, bad){
+  let t = $(".toast"); if (!t){ t = document.createElement("div"); t.className = "toast"; t.setAttribute("role","status"); document.body.appendChild(t); }
+  t.textContent = msg; t.classList.toggle("bad", !!bad); t.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200);
+}
+function modal(html, opts = {}){
+  const root = $("#modal-root");
+  root.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><div class="mbox ${opts.wide ? "wide" : ""}">${html}</div></div>`;
+  const m = $(".modal", root);
+  if (!opts.locked){
+    m.addEventListener("click", e => { if (e.target === m) closeModal(); });
+    m.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+  }
+  const f = $("button, input, textarea, select", m); if (f) f.focus();
+  return $(".mbox", m);
+}
+function closeModal(){ $("#modal-root").innerHTML = ""; }
+function typeset(el){
+  if (window.renderMathInElement){
+    try { renderMathInElement(el, { delimiters:[{left:"\\[",right:"\\]",display:true},{left:"\\(",right:"\\)",display:false}], throwOnError:false }); } catch {}
+  }
+}
+window.addEventListener("load", () => typeset(app));
+
+/* ============ dates ============ */
+const toD = iso => new Date(String(iso).slice(0,10) + "T12:00:00");
+const fmtDay = iso => iso ? toD(iso).toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric"}) : "";
+const fmtShort = iso => iso ? toD(iso).toLocaleDateString("en-US", {month:"short", day:"numeric"}) : "";
+const fmtWhen = iso => { if (!iso) return ""; const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("en-US", {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}); };
+function mondayOf(iso){ const d = toD(iso); const w = d.getDay(); d.setDate(d.getDate() + (w === 0 ? 1 : 1 - w)); /* Sunday counts toward the coming week */ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+function todayISO(){ const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+
+/* ============ content ============ */
+const TYPES = [
+  ["Find the Mistake", "var(--pink)"],
+  ["Always, Sometimes, Never", "var(--lav)"],
+  ["Visual Pattern", "var(--mint)"],
+  ["Open Middle", "var(--sky)"],
+  ["Which One Doesn't Belong?", "var(--butter)"],
+  ["Real-World Decision", "var(--peach)"],
+  ["Write Your Own", "var(--rose)"],
+  ["Estimation Challenge", "var(--teal)"],
+  ["Multistep Challenge", "var(--lav)"]
+];
+const typeColor = t => (TYPES.find(x => x[0].toLowerCase() === String(t).toLowerCase()) || [0, "var(--lav)"])[1];
+const UNITS = ["Rational Numbers","Real Numbers","Expressions, Equations & Inequalities","Ratios, Proportions & Percent","Functions & Linear Relationships","Geometry Foundations","Transformations","Pythagorean Theorem","Circles & Area of Composite Figures","Surface Area & Volume","Statistics","Probability","Financial Literacy"];
+const unitList = s => String(s || "").split(/[,;\s]+/).map(x => parseInt(x, 10)).filter(n => n >= 1 && n <= 13);
+const unitLabel = s => { const u = unitList(s); return u.length ? (u.length === 1 ? "Unit " : "Units ") + u.join(" + ") : ""; };
+const LETTERS = "abcdefghijklm";
+
+function inline(s){
+  return esc(s).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+}
+function md(src){
+  const lines = String(src || "").replace(/\r/g, "").split("\n");
+  const out = []; let kind = null, buf = [];
+  const flush = () => {
+    if (!buf.length){ kind = null; return; }
+    if (kind === "p") out.push("<p>" + buf.map(inline).join("<br>") + "</p>");
+    else if (kind === "ul") out.push("<ul>" + buf.map(x => "<li>" + inline(x) + "</li>").join("") + "</ul>");
+    else if (kind === "table"){
+      const rows = buf.filter(r => /[^|\-:\s]/.test(r))
+        .map(r => r.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(c => c.trim()));
+      const [h, ...body] = rows;
+      out.push('<div class="mdtable"><table><thead><tr>' + h.map(c => "<th>" + inline(c) + "</th>").join("") + "</tr></thead><tbody>" +
+        body.map(r => "<tr>" + r.map(c => "<td>" + inline(c) + "</td>").join("") + "</tr>").join("") + "</tbody></table></div>");
+    }
+    buf = []; kind = null;
+  };
+  for (const raw of lines){
+    const line = raw.replace(/\s+$/, "");
+    let k, val = line;
+    if (!line.trim()) { flush(); continue; }
+    if (/^\s*\|.*\|\s*$/.test(line)) k = "table";
+    else if (/^\s*[-•]\s+/.test(line)) { k = "ul"; val = line.replace(/^\s*[-•]\s+/, ""); }
+    else k = "p";
+    if (k !== kind) flush();
+    kind = k; buf.push(val);
+  }
+  flush();
+  return out.join("");
+}
+
+/* ============ state ============ */
+const S = {
+  data: null, me: null, work: [], view: "board", pid: null, drafts: {},
+  t: { pass: "", data: null, view: "review", f: { pid: "", cls: "", status: "Needs review" }, subId: null, edit: null, imgs: {} }
+};
+
+/* ============ nav ============ */
+function setNav(items, current){
+  const nav = $("#nav");
+  if (!items){ nav.hidden = true; nav.innerHTML = ""; return; }
+  nav.hidden = false;
+  nav.innerHTML = items.map(([k, label, count]) =>
+    `<button type="button" data-k="${k}" ${k === current ? 'aria-current="page"' : ""}>${esc(label)}${count ? `<span class="count">${count}</span>` : ""}</button>`).join("");
+  $$("button", nav).forEach(b => b.onclick = () => navGo(b.dataset.k));
+}
+function navGo(k){
+  if (k === "board" || k === "mywork"){ S.view = k; renderStudent(); }
+  else if (k === "switch"){ signOut(); }
+  else if (k === "t-exit"){ S.t.data = null; startStudent(); }
+  else if (k === "t-out"){ S.t.data = null; api("teacherSignOut").finally(startStudent); }
+  else { S.t.view = k; S.t.subId = null; S.t.edit = null; renderTeacher(); }
+  window.scrollTo(0, 0);
+}
+
+/* ============ STUDENT ============ */
+async function startStudent(){
+  $("#teacher-link").hidden = false;
+  setNav(null);
+  app.innerHTML = `<div class="card empty"><div class="spin" aria-hidden="true"></div><p style="margin-top:12px">Loading challenges…</p></div>`;
+  try {
+    S.data = await api("getStudentData");
+    $("#site-title").textContent = S.data.title || "Think Bigger";
+    $("#site-sub").textContent = S.data.subtitle || "";
+    const saved = ss.get("tb-me");
+    if (saved){
+      try { const r = await api("checkStudent", saved.name, saved.cls, saved.pin); S.me = { name: r.name, cls: r.cls, pin: saved.pin }; S.work = r.work; }
+      catch { S.me = null; ss.del("tb-me"); }
+    }
+    S.view = "board"; renderStudent();
+  } catch (e){
+    app.innerHTML = `<div class="card empty"><h2>We couldn't load the challenges</h2><p style="margin-top:8px">${esc(errMsg(e))}</p><p style="margin-top:14px"><button class="btn" type="button" id="retry">Try again</button></p></div>`;
+    $("#retry").onclick = startStudent;
+  }
+}
+function signOut(){
+  S.me = null; S.work = []; ss.del("tb-me"); S.view = "board"; renderStudent();
+}
+function myProblems(){
+  if (!S.data) return [];
+  const cls = S.me ? S.me.cls.toLowerCase() : "";
+  return S.data.problems.filter(p => !p.classes.length || p.classes.some(c => c.toLowerCase() === cls));
+}
+function latestFor(pid){ return S.work.find(w => w.problemId === pid) || null; }
+function statusPill(w){
+  if (!w) return `<span class="pill todo">Not started</span>`;
+  if (w.status === "Reviewed") return `<span class="pill done">${w.score != null ? `Scored ${w.score}/${w.points}` : "Reviewed"}</span>`;
+  if (w.status === "Revise") return `<span class="pill rev">Revise &amp; resubmit</span>`;
+  return `<span class="pill in">Turned in</span>`;
+}
+function renderStudent(){
+  $("#foot-who").textContent = "";
+  if (!S.me){ setNav(null); return renderSignin(); }
+  const revise = S.work.filter((w, i, a) => a.findIndex(x => x.problemId === w.problemId) === i && w.status === "Revise").length;
+  setNav([["board","Challenges"],["mywork","My work", revise || 0],["switch","Not " + S.me.name.split(/[\s,]+/)[0] + "?"]], S.view);
+  $("#foot-who").textContent = `Signed in as ${S.me.name} · ${S.me.cls} ·`;
+  if (S.view === "problem") return renderProblem();
+  if (S.view === "mywork") return renderMyWork();
+  return renderBoard();
+}
+
+function renderSignin(){
+  const roster = S.data.roster;
+  const classes = [...new Set(roster.map(r => r.cls))].filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, {numeric:true}));
+  const count = S.data.problems.length;
+  app.innerHTML = `
+  <section class="card hero">
+    <div class="stack">
+      <div class="stack" style="gap:6px"><h2>Who's working today?</h2><p class="muted">Pick your class and your name. ${count ? `There ${count === 1 ? "is 1 challenge" : `are ${count} challenges`} open right now.` : ""}</p></div>
+      ${roster.length ? `
+      <form id="si" class="stack" autocomplete="off" style="gap:12px">
+        <div class="field"><label class="lbl" for="si-cls">Class</label>
+          <select id="si-cls"><option value="">Choose your class…</option>${classes.map(c => `<option>${esc(c)}</option>`).join("")}</select></div>
+        <div class="field"><label class="lbl" for="si-name">Your name</label>
+          <select id="si-name" disabled><option value="">Choose your class first</option></select></div>
+        <div class="field" id="si-pin-f" hidden><label class="lbl" for="si-pin">Your PIN</label>
+          <input type="password" id="si-pin" inputmode="numeric" maxlength="12" placeholder="The PIN your teacher gave you"></div>
+        <p class="err" id="si-err" role="alert"></p>
+        <div><button class="btn big" type="submit" id="si-go" disabled>Let's go</button></div>
+      </form>` : `<div class="note warn">Your teacher hasn't added the class list yet. Check back soon!</div>`}
+    </div>
+    <div class="hero-art" aria-label="How it works">
+      <div class="step"><span class="n">1</span><span><b>Pick a challenge.</b> New ones are posted every week.</span></div>
+      <div class="step"><span class="n">2</span><span><b>Show your thinking.</b> Type it, draw it, or snap a photo of your paper.</span></div>
+      <div class="step"><span class="n">3</span><span><b>Turn it in.</b> Check "My work" for your score and feedback.</span></div>
+    </div>
+  </section>`;
+  if (!roster.length) return;
+  const cls = $("#si-cls"), nm = $("#si-name"), pinF = $("#si-pin-f"), pin = $("#si-pin"), go = $("#si-go");
+  const pick = () => roster.find(r => r.cls === cls.value && r.name === nm.value);
+  cls.onchange = () => {
+    const names = roster.filter(r => r.cls === cls.value).map(r => r.name).sort((a, b) => a.localeCompare(b));
+    nm.innerHTML = `<option value="">${cls.value ? "Choose your name…" : "Choose your class first"}</option>` + names.map(n => `<option>${esc(n)}</option>`).join("");
+    nm.disabled = !cls.value; pinF.hidden = true; go.disabled = true;
+  };
+  nm.onchange = () => { const r = pick(); pinF.hidden = !(r && r.pin); go.disabled = !r; if (r && r.pin) pin.focus(); };
+  $("#si").onsubmit = async e => {
+    e.preventDefault();
+    const r = pick(); if (!r) return;
+    go.disabled = true; go.textContent = "Checking…"; $("#si-err").textContent = "";
+    try {
+      const res = await api("checkStudent", r.name, r.cls, r.pin ? pin.value : "");
+      S.me = { name: res.name, cls: res.cls, pin: r.pin ? pin.value : "" }; S.work = res.work;
+      ss.set("tb-me", S.me); S.view = "board"; renderStudent();
+    } catch (err){
+      $("#si-err").textContent = errMsg(err); go.disabled = false; go.textContent = "Let's go";
+    }
+  };
+}
+
+function renderBoard(){
+  const probs = myProblems();
+  const today = S.data.today || todayISO();
+  const latest = {}; S.work.forEach(w => { if (!latest[w.problemId]) latest[w.problemId] = w; });
+  const done = probs.filter(p => latest[p.id]).length;
+  const pts = Object.values(latest).reduce((a, w) => a + (w.status === "Reviewed" && w.score != null ? w.score : 0), 0);
+  const weeks = {};
+  probs.forEach(p => { const k = p.postDate ? mondayOf(p.postDate) : "anytime"; (weeks[k] = weeks[k] || []).push(p); });
+  const keys = Object.keys(weeks).sort((a, b) => a === "anytime" ? 1 : b === "anytime" ? -1 : b.localeCompare(a));
+  const thisWeek = mondayOf(today);
+  app.innerHTML = `
+    <div class="row"><h2>Hi, ${esc(S.me.name.split(/[\s,]+/)[0])}!</h2></div>
+    <div class="stats">
+      <div class="stat"><b>${probs.length - done}</b><span>Waiting for you</span></div>
+      <div class="stat"><b>${done}</b><span>Turned in</span></div>
+      <div class="stat"><b>${pts}</b><span>Extra credit points</span></div>
+    </div>
+    ${probs.length ? keys.map(k => `
+      <section class="week stack" style="gap:12px">
+        <h2>${k === "anytime" ? "Anytime" : "Week of " + esc(fmtShort(k))}${k === thisWeek ? " <small>This week</small>" : ""}</h2>
+        <div class="cards">${weeks[k].sort((a, b) => (a.postDate || "").localeCompare(b.postDate || "") || a.title.localeCompare(b.title)).map(p => {
+          const w = latest[p.id]; const late = p.dueDate && p.dueDate < today && !w;
+          return `<button class="pcard" type="button" data-pid="${esc(p.id)}" style="--tc:${typeColor(p.type)}">
+            <div class="band"><span class="t">${esc(p.type || "Challenge")}</span><span class="pts">${p.points} pts</span></div>
+            <div class="body">
+              <div class="ttl">${esc(p.title)}</div>
+              <div class="meta">${esc([unitLabel(p.units), p.topics].filter(Boolean).join(" · "))}</div>
+              <div class="foot">${statusPill(w)}<span class="dim">${p.dueDate ? (late ? `<span class="pill late">Past due</span>` : "Due " + esc(fmtDay(p.dueDate))) : ""}</span></div>
+            </div></button>`; }).join("")}</div>
+      </section>`).join("") : `<div class="card empty"><h2>No challenges yet</h2><p style="margin-top:6px">New extra credit challenges show up here. Check back soon!</p></div>`}
+  `;
+  $$(".pcard").forEach(b => b.onclick = () => openProblem(b.dataset.pid));
+}
+
+/* ---- drafts ---- */
+function draftKey(pid){ return "tb-d:" + S.me.name + "|" + S.me.cls + "|" + pid; }
+function getDraft(p){
+  if (S.drafts[p.id]) return S.drafts[p.id];
+  const n = Math.max(1, p.parts.length);
+  let d = ss.get(draftKey(p.id));
+  if (!d || !Array.isArray(d.parts) || d.parts.length !== n) d = { parts: Array.from({length: n}, () => ({})) };
+  d.parts.forEach(x => { x.tab = x.tab || "write"; x.text = x.text || ""; x.strokes = x.strokes || []; x.redo = []; x.photos = x.photos || []; if (x.grid === undefined) x.grid = true; x.height = x.height || 620; });
+  return (S.drafts[p.id] = d);
+}
+let draftT;
+function saveDraft(pid){
+  clearTimeout(draftT);
+  draftT = setTimeout(() => {
+    const d = S.drafts[pid]; if (!d || !S.me) return;
+    ss.set(draftKey(pid), { parts: d.parts.map(x => ({ tab:x.tab, text:x.text, strokes:x.strokes, photos:x.photos, grid:x.grid, height:x.height })) });
+    const n = $("#draft-note"); if (n) n.textContent = "Draft saved on this device";
+  }, 700);
+}
+const strokesAfterClear = st => { let i = st.length - 1; while (i >= 0 && !st[i].x) i--; return st.slice(i + 1); };
+const hasDraw = x => strokesAfterClear(x.strokes).length > 0;
+const hasText = x => !!x.text.trim();
+const hasPhoto = x => x.photos.length > 0;
+
+function openProblem(pid){ S.pid = pid; S.view = "problem"; renderStudent(); window.scrollTo(0, 0); }
+
+function renderProblem(){
+  const p = myProblems().find(x => x.id === S.pid);
+  if (!p){ S.view = "board"; return renderBoard(); }
+  const d = getDraft(p);
+  const w = latestFor(p.id);
+  const today = S.data.today || todayISO();
+  const parts = p.parts.length ? p.parts : [""];
+  app.innerHTML = `
+    <div><button class="link" type="button" id="back">← All challenges</button></div>
+    <section class="card phead">
+      <div class="row"><span class="badge" style="background:${typeColor(p.type)}">${esc(p.type || "Challenge")}</span><span class="badge" style="background:#f1eff7">${p.points} points</span>
+        ${p.dueDate ? `<span class="badge" style="background:${p.dueDate < today ? "var(--bad-bg)" : "#f1eff7"}">Due ${esc(fmtDay(p.dueDate))}</span>` : ""}</div>
+      <h2 style="font-size:1.6rem">${esc(p.title)}</h2>
+      <p class="muted">${esc([unitLabel(p.units), p.topics].filter(Boolean).join(" · "))}</p>
+      ${w ? `<div class="note ${w.status === "Revise" ? "warn" : ""}">
+        <div class="row">${statusPill(w)}<span class="dim">You turned this in ${esc(fmtWhen(w.submitted))}${w.attempt > 1 ? ` (try ${w.attempt})` : ""}.</span></div>
+        ${w.feedback ? `<p style="margin-top:8px;white-space:pre-wrap"><b>Feedback:</b> ${esc(w.feedback)}</p>` : ""}
+        <p class="dim" style="margin-top:6px">You can turn it in again if you want to improve it.</p></div>` : ""}
+    </section>
+    <section class="card prompt" id="prompt">${md(p.prompt)}${p.hasImage ? `<div id="pimg" class="dim">Loading picture…</div>` : ""}</section>
+    <p class="muted" style="font-weight:700">For each part, show your thinking by typing it, drawing it, or adding a photo of your paper. You can use more than one.</p>
+    ${parts.map((q, i) => `
+      <section class="card part" data-i="${i}">
+        <div class="part-h"><span class="part-l">${p.parts.length ? LETTERS[i] : "✓"}</span><div class="part-q">${q ? md(q) : "<p>Show your work and explain your thinking.</p>"}</div></div>
+        <div class="wtabs" role="tablist" aria-label="Ways to show your work"></div>
+        <div class="warea"></div>
+      </section>`).join("")}
+    <div class="turnin"><button class="btn big" type="button" id="submit">Turn it in</button><span class="dim" id="draft-note">Your work saves on this device until you turn it in.</span></div>
+  `;
+  $("#back").onclick = () => { S.view = "board"; renderStudent(); };
+  typeset(app);
+  if (p.hasImage){
+    api("getProblemImage", p.id, "").then(url => {
+      const el = $("#pimg"); if (!el) return;
+      el.outerHTML = url ? `<img src="${url}" alt="Picture for this challenge">` : "";
+    }).catch(() => { const el = $("#pimg"); if (el) el.textContent = "The picture didn't load."; });
+  }
+  $$(".part").forEach(sec => renderWork(p, d, +sec.dataset.i));
+  $("#submit").onclick = () => confirmSubmit(p, d);
+}
+
+function renderWork(p, d, i){
+  const sec = $(`.part[data-i="${i}"]`); const x = d.parts[i];
+  const tabs = [["write","Type it",hasText(x)],["draw","Draw it",hasDraw(x)],["photo","Photo",hasPhoto(x)]];
+  $(".wtabs", sec).innerHTML = tabs.map(([k, l, has]) => `<button class="wtab" role="tab" type="button" data-k="${k}" aria-selected="${x.tab === k}">${l}${has ? '<span class="dot" aria-label="has work"></span>' : ""}</button>`).join("");
+  $$(".wtab", sec).forEach(b => b.onclick = () => { x.tab = b.dataset.k; saveDraft(p.id); renderWork(p, d, i); });
+  const area = $(".warea", sec);
+  const changed = () => { saveDraft(p.id); const has = { write: hasText(x), draw: hasDraw(x), photo: hasPhoto(x) };
+    $$(".wtab", sec).forEach(b => { const dot = $(".dot", b); if (has[b.dataset.k] && !dot) b.insertAdjacentHTML("beforeend", '<span class="dot" aria-label="has work"></span>'); if (!has[b.dataset.k] && dot) dot.remove(); }); };
+  if (x.tab === "write"){
+    const keys = ["²","³","√","π","×","÷","−","±","≤","≥","≠","≈","°","½","¼","¾","→"];
+    area.innerHTML = `<div class="mkeys" aria-label="Math symbols">${keys.map(k => `<button type="button" class="mkey" data-k="${k}">${k}</button>`).join("")}</div>
+      <textarea aria-label="Type your work for this part" placeholder="Write each step on its own line, and explain why you did it.">${esc(x.text)}</textarea>`;
+    const ta = $("textarea", area);
+    ta.oninput = () => { x.text = ta.value; changed(); };
+    $$(".mkey", area).forEach(b => b.onclick = () => {
+      const s = ta.selectionStart, e = ta.selectionEnd;
+      ta.value = ta.value.slice(0, s) + b.dataset.k + ta.value.slice(e);
+      ta.selectionStart = ta.selectionEnd = s + b.dataset.k.length; ta.focus(); x.text = ta.value; changed();
+    });
+  } else if (x.tab === "draw"){
+    new Pad(area, x, changed);
+  } else {
+    area.innerHTML = `<div class="phs">${x.photos.map((u, j) => `<div class="ph"><img src="${u}" alt="Photo ${j+1} of your work"><button type="button" data-j="${j}" aria-label="Remove photo ${j+1}">✕</button></div>`).join("")}
+      ${x.photos.length < 3 ? `<label class="addph"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Add a photo<input type="file" accept="image/*" multiple hidden></label>` : ""}</div>
+      <p class="dim" style="margin-top:8px">Take a clear picture of your paper in good light. Up to 3 photos per part.</p>`;
+    $$(".ph button", area).forEach(b => b.onclick = () => { x.photos.splice(+b.dataset.j, 1); changed(); renderWork(p, d, i); });
+    const inp = $("input[type=file]", area);
+    if (inp) inp.onchange = async () => {
+      const files = Array.from(inp.files || []).slice(0, 3 - x.photos.length);
+      for (const f of files){
+        try { x.photos.push(await shrinkImage(f)); }
+        catch { toast("That photo couldn't be opened. Try a JPG or PNG, or take a screenshot.", true); }
+      }
+      changed(); renderWork(p, d, i);
+    };
+  }
+}
+
+function shrinkImage(file, max = 1600, q = 0.82){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file); const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); res(c.toDataURL("image/jpeg", q));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("bad image")); };
+    img.src = url;
+  });
+}
+
+/* ---- drawing pad ---- */
+const PEN_COLORS = [["#1d1638","Black"],["#2f6bff","Blue"],["#e0244d","Red"],["#13955a","Green"]];
+const PAD_W = 1000;
+class Pad {
+  constructor(host, st, onChange){
+    this.st = st; this.onChange = onChange;
+    this.color = st.color || PEN_COLORS[0][0]; this.size = st.size || 4; this.erase = false; this.sawPen = false;
+    host.innerHTML = `
+      <div class="pad-tools" role="toolbar" aria-label="Drawing tools">
+        <div class="tg">${PEN_COLORS.map(([c, n]) => `<button type="button" class="sw" data-c="${c}" style="--sw:${c}" aria-label="${n} pen"></button>`).join("")}</div>
+        <div class="tg"><button type="button" class="tb" data-s="3">Thin</button><button type="button" class="tb" data-s="7">Thick</button><button type="button" class="tb" data-a="erase">Eraser</button></div>
+        <div class="tg"><button type="button" class="tb" data-a="undo">Undo</button><button type="button" class="tb" data-a="redo">Redo</button><button type="button" class="tb" data-a="clear">Clear</button></div>
+        <div class="tg"><button type="button" class="tb" data-a="grid">Graph paper</button></div>
+      </div>
+      <div class="pad-wrap"><canvas class="pad-bg"></canvas><canvas class="pad-ink" aria-label="Drawing area"></canvas></div>
+      <div class="pad-foot"><button type="button" class="btn ghost sm" data-a="more">+ More room</button><span class="dim">Use a stylus, your finger, or a mouse.</span></div>`;
+    this.host = host; this.wrap = $(".pad-wrap", host); this.bg = $(".pad-bg", host); this.ink = $(".pad-ink", host);
+    this.size_(); this.bind(); this.tools();
+  }
+  size_(){
+    const h = this.st.height;
+    this.wrap.style.aspectRatio = PAD_W + " / " + h;
+    [this.bg, this.ink].forEach(c => { c.width = PAD_W; c.height = h; });
+    this.drawBg(); this.redraw();
+  }
+  drawBg(){ const g = this.bg.getContext("2d"); Pad.paper(g, PAD_W, this.st.height, this.st.grid); }
+  static paper(g, w, h, grid){
+    g.fillStyle = "#fff"; g.fillRect(0, 0, w, h);
+    if (!grid) return;
+    g.lineWidth = 1;
+    for (let x = 40; x < w; x += 40){ g.strokeStyle = x % 200 ? "#e4ebf7" : "#cdd9ef"; g.beginPath(); g.moveTo(x + .5, 0); g.lineTo(x + .5, h); g.stroke(); }
+    for (let y = 40; y < h; y += 40){ g.strokeStyle = y % 200 ? "#e4ebf7" : "#cdd9ef"; g.beginPath(); g.moveTo(0, y + .5); g.lineTo(w, y + .5); g.stroke(); }
+  }
+  static stroke(g, s, from = 0){
+    const p = s.p; if (!p.length) return;
+    g.globalCompositeOperation = s.e ? "destination-out" : "source-over";
+    g.strokeStyle = g.fillStyle = s.c; g.lineWidth = s.e ? 30 : s.w; g.lineCap = "round"; g.lineJoin = "round";
+    if (p.length === 1){ g.beginPath(); g.arc(p[0][0], p[0][1], g.lineWidth / 2, 0, Math.PI * 2); g.fill(); }
+    else { g.beginPath(); const a = Math.max(0, from - 1); g.moveTo(p[a][0], p[a][1]); for (let i = a + 1; i < p.length; i++) g.lineTo(p[i][0], p[i][1]); g.stroke(); }
+    g.globalCompositeOperation = "source-over";
+  }
+  redraw(){
+    const g = this.ink.getContext("2d"); g.clearRect(0, 0, PAD_W, this.st.height);
+    strokesAfterClear(this.st.strokes).forEach(s => Pad.stroke(g, s));
+    this.tools();
+  }
+  pt(e){ const r = this.ink.getBoundingClientRect(); const k = PAD_W / r.width;
+    return [Math.round((e.clientX - r.left) * k * 10) / 10, Math.round((e.clientY - r.top) * k * 10) / 10]; }
+  bind(){
+    const c = this.ink, g = c.getContext("2d");
+    c.addEventListener("pointerdown", e => {
+      if (e.pointerType === "pen") this.sawPen = true;
+      if (e.pointerType === "touch" && this.sawPen) return;
+      if (e.button > 0) return;
+      e.preventDefault(); try { c.setPointerCapture(e.pointerId); } catch {}
+      this.active = e.pointerId; this.cur = { c: this.color, w: this.size, e: this.erase, p: [this.pt(e)] };
+      Pad.stroke(g, this.cur);
+    });
+    c.addEventListener("pointermove", e => {
+      if (e.pointerId !== this.active || !this.cur) return;
+      e.preventDefault();
+      const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      const from = this.cur.p.length;
+      (evs.length ? evs : [e]).forEach(ev => this.cur.p.push(this.pt(ev)));
+      Pad.stroke(g, this.cur, from);
+    });
+    const end = e => {
+      if (e.pointerId !== this.active || !this.cur) return;
+      this.st.strokes.push(this.cur); this.st.redo = []; this.cur = null; this.active = null;
+      if (this.erase) this.redraw(); else this.tools();
+      this.onChange();
+    };
+    c.addEventListener("pointerup", end); c.addEventListener("pointercancel", end); c.addEventListener("lostpointercapture", end);
+    this.host.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.c){ this.color = this.st.color = b.dataset.c; this.erase = false; }
+      else if (b.dataset.s){ this.size = this.st.size = +b.dataset.s; this.erase = false; }
+      else if (b.dataset.a === "erase") this.erase = !this.erase;
+      else if (b.dataset.a === "undo"){ if (this.st.strokes.length){ this.st.redo.push(this.st.strokes.pop()); this.redraw(); this.onChange(); } }
+      else if (b.dataset.a === "redo"){ if (this.st.redo.length){ this.st.strokes.push(this.st.redo.pop()); this.redraw(); this.onChange(); } }
+      else if (b.dataset.a === "clear"){ if (hasDraw(this.st)){ this.st.strokes.push({ x: 1, p: [] }); this.st.redo = []; this.redraw(); this.onChange(); toast("Cleared. Press Undo to bring it back."); } }
+      else if (b.dataset.a === "grid"){ this.st.grid = !this.st.grid; this.drawBg(); this.onChange(); }
+      else if (b.dataset.a === "more"){ if (this.st.height < 3000){ this.st.height += 360; this.size_(); this.onChange(); } else toast("That's as big as it gets. Try a photo for really long work."); }
+      this.tools();
+    });
+  }
+  tools(){
+    $$(".sw", this.host).forEach(b => b.setAttribute("aria-pressed", String(!this.erase && b.dataset.c === this.color)));
+    $$("[data-s]", this.host).forEach(b => b.setAttribute("aria-pressed", String(!this.erase && +b.dataset.s === this.size)));
+    const er = $('[data-a="erase"]', this.host); if (er) er.setAttribute("aria-pressed", String(this.erase));
+    const gr = $('[data-a="grid"]', this.host); if (gr) gr.setAttribute("aria-pressed", String(!!this.st.grid));
+    const u = $('[data-a="undo"]', this.host); if (u) u.disabled = !this.st.strokes.length;
+    const r = $('[data-a="redo"]', this.host); if (r) r.disabled = !this.st.redo.length;
+    const cl = $('[data-a="clear"]', this.host); if (cl) cl.disabled = !hasDraw(this.st);
+  }
+  static exportPNG(st){
+    const strokes = strokesAfterClear(st.strokes); if (!strokes.length) return null;
+    // crop height to the drawn content (+ margin) so pictures aren't mostly blank
+    let maxY = 0; strokes.forEach(s => { if (!s.e) s.p.forEach(q => { if (q[1] > maxY) maxY = q[1]; }); });
+    const h = Math.min(st.height, Math.max(300, Math.ceil((maxY + 60) / 40) * 40));
+    const ink = document.createElement("canvas"); ink.width = PAD_W; ink.height = st.height;
+    const gi = ink.getContext("2d"); strokes.forEach(s => Pad.stroke(gi, s));
+    const c = document.createElement("canvas"); c.width = PAD_W; c.height = h;
+    const g = c.getContext("2d"); Pad.paper(g, PAD_W, h, st.grid); g.drawImage(ink, 0, 0);
+    return c.toDataURL("image/png");
+  }
+}
+
+/* ---- submit ---- */
+function confirmSubmit(p, d){
+  const labels = p.parts.length ? p.parts.map((_, i) => "Part " + LETTERS[i]) : ["Your work"];
+  const rows = d.parts.map((x, i) => {
+    const what = [hasText(x) && "typed", hasDraw(x) && "drawing", hasPhoto(x) && (x.photos.length + " photo" + (x.photos.length > 1 ? "s" : ""))].filter(Boolean);
+    return { label: labels[i], what, ok: what.length > 0 };
+  });
+  const any = rows.some(r => r.ok), missing = rows.filter(r => !r.ok).length;
+  const box = modal(`
+    <h2>Ready to turn it in?</h2>
+    <ul class="checks">${rows.map(r => `<li><span class="${r.ok ? "ok" : "no"}">${r.ok ? "✓" : "!"}</span><b>${esc(r.label)}</b><span class="muted">${r.ok ? esc(r.what.join(" + ")) : "Nothing yet"}</span></li>`).join("")}</ul>
+    ${!any ? `<p class="err">Add some work before you turn it in.</p>` : missing ? `<div class="note warn">${missing === 1 ? "One part is" : missing + " parts are"} empty. You can still turn it in, but you might miss points.</div>` : `<div class="note">Did you explain your thinking, not just the answer? Explanations earn the most points.</div>`}
+    <div class="row"><button class="btn" type="button" id="m-go" ${any ? "" : "disabled"}>Turn it in</button><button class="btn ghost" type="button" id="m-no">Keep working</button></div>`);
+  $("#m-no", box).onclick = closeModal;
+  $("#m-go", box).onclick = () => doSubmit(p, d);
+}
+async function doSubmit(p, d){
+  modal(`<div class="stack" style="align-items:center;text-align:center;padding:16px 0"><div class="spin" aria-hidden="true"></div><h2>Turning in your work…</h2><p class="muted">Pictures can take a few seconds. Please don't close this page.</p></div>`, { locked: true });
+  try {
+    const responses = d.parts.map((x, i) => ({
+      part: p.parts.length ? LETTERS[i] : "",
+      text: x.text.trim(),
+      drawing: Pad.exportPNG(x),
+      photos: x.photos.slice(0, 3)
+    }));
+    const res = await api("submitWork", { name: S.me.name, cls: S.me.cls, pin: S.me.pin, problemId: p.id, responses });
+    ss.del(draftKey(p.id)); delete S.drafts[p.id];
+    if (Array.isArray(res.work)) S.work = res.work;
+    const box = modal(`<div class="stack" style="align-items:center;text-align:center;padding:10px 0">
+      <div class="bigcheck"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#16794a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+      <h2>Turned in!</h2><p class="muted">“${esc(p.title)}”${res.attempt > 1 ? ` (try ${res.attempt})` : ""} is on its way to your teacher. Check <b>My work</b> for your score and feedback.</p>
+      <button class="btn" type="button" id="m-ok">Back to challenges</button></div>`);
+    $("#m-ok", box).onclick = () => { closeModal(); S.view = "board"; renderStudent(); window.scrollTo(0, 0); };
+  } catch (e){
+    const box = modal(`<h2>That didn't go through</h2><p>${esc(errMsg(e))}</p><p class="muted">Your work is still here. Try again in a moment.</p><div class="row"><button class="btn" type="button" id="m-ok">OK</button></div>`);
+    $("#m-ok", box).onclick = closeModal;
+  }
+}
+
+function renderMyWork(){
+  const items = S.work;
+  app.innerHTML = `<h2>My work</h2>
+    ${items.length ? `<div class="wlist">${items.map(w => {
+      const open = S.data.problems.some(p => p.id === w.problemId);
+      return `<section class="card witem">
+        <div class="row"><h3 style="flex:1;min-width:12em">${esc(w.problem)}</h3>${statusPill(w)}</div>
+        <p class="dim">Turned in ${esc(fmtWhen(w.submitted))}${w.attempt > 1 ? ` · Try ${w.attempt}` : ""}</p>
+        ${w.feedback ? `<div class="fb ${w.status === "Revise" ? "rev" : ""}"><b>Feedback:</b> ${esc(w.feedback)}</div>` : w.status === "Needs review" ? `<p class="muted">Waiting for your teacher to review it.</p>` : ""}
+        ${open && w.status === "Revise" ? `<div><button class="btn sm" type="button" data-pid="${esc(w.problemId)}">Revise it</button></div>` : ""}
+      </section>`; }).join("")}</div>`
+    : `<div class="card empty"><h2>Nothing turned in yet</h2><p style="margin-top:6px">When you turn in a challenge, it shows up here with your score and feedback.</p></div>`}`;
+  $$("[data-pid]", app).forEach(b => b.onclick = () => openProblem(b.dataset.pid));
+}
+
+/* ============ TEACHER ============ */
+$("#teacher-link").onclick = () => startTeacher();
+
+async function startTeacher(){
+  $("#teacher-link").hidden = true; $("#foot-who").textContent = "";
+  setNav(null);
+  app.innerHTML = `<div class="card empty"><div class="spin" aria-hidden="true"></div></div>`;
+  let who = null;
+  try { who = await api("teacherSession"); } catch {}
+  if (who) return loadTeacher();
+  app.innerHTML = `
+    <section class="card stack" style="max-width:460px;margin:0 auto;width:100%">
+      <h2>Teacher sign in</h2>
+      <p class="muted">Use the email and password you made in Supabase.</p>
+      <form id="tl" class="stack" style="gap:12px">
+        <div class="field"><label class="lbl" for="tl-m">Email</label><input type="text" id="tl-m" autocomplete="username" inputmode="email"></div>
+        <div class="field"><label class="lbl" for="tl-p">Password</label><input type="password" id="tl-p" autocomplete="current-password"></div>
+        <p class="err" id="tl-e" role="alert"></p>
+        <div class="row"><button class="btn" type="submit">Sign in</button><button class="btn ghost" type="button" id="tl-back">Back to student view</button></div>
+      </form>
+    </section>`;
+  $("#tl-m").focus();
+  $("#tl-back").onclick = () => startStudent();
+  $("#tl").onsubmit = async e => {
+    e.preventDefault(); $("#tl-e").textContent = "";
+    const b = $("#tl button[type=submit]"); b.disabled = true;
+    try { await api("teacherSignIn", $("#tl-m").value.trim(), $("#tl-p").value); loadTeacher(); }
+    catch (err){ $("#tl-e").textContent = /invalid/i.test(errMsg(err)) ? "That email and password didn't match." : errMsg(err); b.disabled = false; }
+  };
+}
+async function loadTeacher(keepView){
+  try {
+    S.t.data = await api("teacherData", S.t.pass);
+    S.t.rows = null;
+    if (!keepView){ S.t.view = "review"; S.t.subId = null; S.t.edit = null; }
+    renderTeacher();
+  } catch (e){
+    app.innerHTML = `<div class="card empty"><h2>Couldn't load teacher data</h2><p style="margin-top:6px">${esc(errMsg(e))}</p></div>`;
+  }
+}
+function tNav(){
+  const n = S.t.data.submissions.filter(s => s.status === "Needs review").length;
+  setNav([["review","Review", n],["challenges","Challenges"],["roster","Class list"],["t-exit","Student view"],["t-out","Sign out"]], S.t.view);
+}
+function renderTeacher(){
+  tNav();
+  $("#foot-who").textContent = "Teacher view ·";
+  if (S.t.view === "challenges") return S.t.edit ? renderEditor() : renderChallenges();
+  if (S.t.view === "import") return renderImport();
+  if (S.t.view === "roster") return renderRoster();
+  return S.t.subId ? renderReviewOne() : renderReviewList();
+}
+const T = () => S.t.data;
+const probById = id => T().problems.find(p => p.id === id);
+
+/* ---- review list ---- */
+function filteredSubs(){
+  const f = S.t.f;
+  return T().submissions.filter(s => (!f.pid || s.problemId === f.pid) && (!f.cls || s.cls === f.cls) && (!f.status || s.status === f.status))
+    .sort((a, b) => b.submitted.localeCompare(a.submitted));
+}
+function renderReviewList(){
+  const d = T(), f = S.t.f;
+  const classes = [...new Set(d.submissions.map(s => s.cls).concat(d.roster.map(r => r.cls)))].filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, {numeric:true}));
+  const probs = d.problems.slice().sort((a, b) => (b.postDate || "").localeCompare(a.postDate || ""));
+  const list = filteredSubs();
+  app.innerHTML = `
+    <div class="row"><h2 style="flex:1">Review student work</h2><button class="btn ghost sm" type="button" id="csv">Download scores (CSV)</button><button class="btn ghost sm" type="button" id="refresh">Refresh</button></div>
+    <div class="filters">
+      <div class="field"><label class="lbl" for="f-p">Challenge</label><select id="f-p"><option value="">All challenges</option>${probs.map(p => `<option value="${esc(p.id)}" ${p.id === f.pid ? "selected" : ""}>${esc(p.title)}</option>`).join("")}</select></div>
+      <div class="field"><label class="lbl" for="f-c">Class</label><select id="f-c"><option value="">All classes</option>${classes.map(c => `<option ${c === f.cls ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
+      <div class="field"><label class="lbl" for="f-s">Status</label><select id="f-s">${[["Needs review","Needs review"],["Revise","Asked to revise"],["Reviewed","Reviewed"],["","Everything"]].map(([v, l]) => `<option value="${v}" ${v === f.status ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+    </div>
+    ${list.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Student</th><th>Class</th><th>Challenge</th><th>Turned in</th><th>Status</th></tr></thead><tbody>
+      ${list.map(s => `<tr class="click" tabindex="0" data-id="${esc(s.id)}"><td><b>${esc(s.student)}</b>${s.attempt > 1 ? ` <span class="dim">try ${s.attempt}</span>` : ""}</td><td>${esc(s.cls)}</td><td>${esc(s.problem)}</td><td class="num">${esc(fmtWhen(s.submitted))}</td>
+        <td>${s.status === "Reviewed" ? `<span class="pill done">${s.score != null ? s.score + "/" + s.points : "Reviewed"}</span>` : s.status === "Revise" ? `<span class="pill rev">Revise</span>` : `<span class="pill in">Needs review</span>`}</td></tr>`).join("")}
+    </tbody></table></div>` : `<div class="card empty"><h2>${f.status === "Needs review" ? "All caught up!" : "Nothing here"}</h2><p style="margin-top:6px">${f.status === "Needs review" ? "No new work is waiting for review." : "No work matches these filters."}</p></div>`}`;
+  $("#f-p").onchange = e => { f.pid = e.target.value; renderReviewList(); };
+  $("#f-c").onchange = e => { f.cls = e.target.value; renderReviewList(); };
+  $("#f-s").onchange = e => { f.status = e.target.value; renderReviewList(); };
+  $("#refresh").onclick = () => loadTeacher(true);
+  $("#csv").onclick = () => downloadCSV(list);
+  $$("tr.click").forEach(tr => { const go = () => { S.t.subId = tr.dataset.id; S.t.queue = list.map(s => s.id); renderTeacher(); window.scrollTo(0, 0); };
+    tr.onclick = go; tr.onkeydown = e => { if (e.key === "Enter") go(); }; });
+}
+
+function downloadCSV(list){
+  const cell = v => { const t = String(v == null ? "" : v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  const head = ["Turned in","Student","Class","Challenge","Try","Status","Score","Out of","Feedback","Typed work"];
+  const rows = list.map(s => [fmtWhen(s.submitted), s.student, s.cls, s.problem, s.attempt, s.status, s.score == null ? "" : s.score, s.points, s.feedback,
+    s.responses.filter(r => (r.text || "").trim()).map(r => (r.part ? r.part + ") " : "") + r.text).join(" | ")]);
+  const csv = [head, ...rows].map(r => r.map(cell).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv" }));
+  a.download = "think-bigger-scores-" + todayISO() + ".csv";
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+/* ---- review one ---- */
+const QUICK = ["Great explanation!","Clear, organized steps.","Show each step of your work.","Explain why, not just what.","Check your signs.","Check your arithmetic.","Label your units.","Revise and resubmit for full credit."];
+function renderReviewOne(){
+  const s = T().submissions.find(x => x.id === S.t.subId);
+  if (!s){ S.t.subId = null; return renderReviewList(); }
+  const p = probById(s.problemId);
+  const q = S.t.queue || []; const qi = q.indexOf(s.id);
+  const prevId = qi > 0 ? q[qi - 1] : null, nextId = qi >= 0 && qi < q.length - 1 ? q[qi + 1] : null;
+  const imgs = S.t.imgs[s.id];
+  const parts = p && p.parts.length ? p.parts : null;
+  app.innerHTML = `
+    <div class="row"><button class="link" type="button" id="back">← Back to list</button><span class="spacer"></span>
+      ${qi >= 0 ? `<span class="dim">${qi + 1} of ${q.length}</span>` : ""}
+      <button class="btn ghost sm" type="button" id="prev" ${prevId ? "" : "disabled"}>Previous</button><button class="btn ghost sm" type="button" id="next" ${nextId ? "" : "disabled"}>Next</button></div>
+    <section class="card stack" style="gap:8px">
+      <div class="row"><h2 style="flex:1">${esc(s.student)} <span class="muted" style="font-size:1rem">· ${esc(s.cls)}</span></h2>${s.status === "Reviewed" ? `<span class="pill done">Reviewed</span>` : s.status === "Revise" ? `<span class="pill rev">Asked to revise</span>` : `<span class="pill in">Needs review</span>`}</div>
+      <p><b>${esc(s.problem)}</b> <span class="dim">· turned in ${esc(fmtWhen(s.submitted))}${s.attempt > 1 ? ` · try ${s.attempt}` : ""}</span></p>
+      ${s.account ? `<p class="dim">Google account used: ${esc(s.account)}</p>` : ""}
+      ${p ? `<details><summary style="cursor:pointer;font-weight:800;color:var(--violet-d)">Show the challenge</summary><div class="prompt" style="margin-top:10px">${md(p.prompt)}</div></details>` : `<p class="dim">This challenge was deleted.</p>`}
+    </section>
+    ${s.responses.map((r, i) => `
+      <section class="resp">
+        <div class="part-h"><span class="part-l">${r.part ? esc(r.part) : "✓"}</span><div class="part-q">${parts && parts[i] ? md(parts[i]) : "<p>Work</p>"}</div></div>
+        ${r.text ? `<div class="txt">${esc(r.text)}</div>` : ""}
+        ${r.drawing || r.photos ? (imgs ? `${imgs[i] && imgs[i].drawing ? `<img src="${imgs[i].drawing}" alt="Student drawing for part ${esc(r.part)}">` : ""}${imgs[i] ? imgs[i].photos.map((u, j) => `<img src="${u}" alt="Student photo ${j + 1} for part ${esc(r.part)}">`).join("") : ""}`
+          : `<p class="dim">Loading pictures…</p>`) : ""}
+        ${!r.text && !r.drawing && !r.photos ? `<p class="dim">No work for this part.</p>` : ""}
+      </section>`).join("")}
+    <section class="card stack" style="gap:12px">
+      <h3>Your review</h3>
+      <div class="row" style="align-items:flex-end">
+        <div class="field" style="width:130px"><label class="lbl" for="rv-s">Score</label><div class="row" style="flex-wrap:nowrap;gap:6px"><input type="number" id="rv-s" min="0" step="0.5" value="${s.score != null ? s.score : ""}"><span class="muted" style="white-space:nowrap">/ ${s.points}</span></div></div>
+        <div class="field"><span class="lbl">Result</span><div class="seg" role="group" aria-label="Result"><button type="button" data-st="Reviewed">Done</button><button type="button" data-st="Revise">Ask to revise</button></div></div>
+      </div>
+      <div class="field"><label class="lbl" for="rv-f">Feedback for the student</label>
+        <div class="chips" style="margin-bottom:8px">${QUICK.map(c => `<button type="button" class="chip" data-q="${esc(c)}">${esc(c)}</button>`).join("")}</div>
+        <textarea id="rv-f" style="min-height:90px">${esc(s.feedback)}</textarea></div>
+      <div class="row"><button class="btn" type="button" id="rv-next">${nextId ? "Save & next" : "Save"}</button>${nextId ? `<button class="btn ghost" type="button" id="rv-save">Save</button>` : ""}<span class="err" id="rv-e" role="alert"></span></div>
+    </section>`;
+  typeset(app);
+  let st = s.status === "Revise" ? "Revise" : "Reviewed";
+  const segs = $$(".seg button"); const paint = () => segs.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.st === st)));
+  segs.forEach(b => b.onclick = () => { st = b.dataset.st; paint(); }); paint();
+  $$(".chip").forEach(c => c.onclick = () => { const ta = $("#rv-f"); ta.value = (ta.value.trim() ? ta.value.trim() + " " : "") + c.dataset.q; ta.focus(); });
+  $$(".resp img").forEach(im => im.onclick = () => { const b = modal(`<img src="${im.src}" alt="" style="width:100%;border-radius:10px"><div><button class="btn ghost" type="button" id="m-x">Close</button></div>`, { wide: true }); $("#m-x", b).onclick = closeModal; });
+  $("#back").onclick = () => { S.t.subId = null; renderTeacher(); };
+  const go = id => { S.t.subId = id; renderTeacher(); window.scrollTo(0, 0); };
+  $("#prev").onclick = () => prevId && go(prevId);
+  $("#next").onclick = () => nextId && go(nextId);
+  const save = async then => {
+    const btns = $$("#rv-next, #rv-save"); btns.forEach(b => b.disabled = true); $("#rv-e").textContent = "";
+    const score = $("#rv-s").value.trim(), feedback = $("#rv-f").value.trim();
+    try {
+      await api("saveReview", S.t.pass, s.id, { score: score === "" ? "" : Number(score), feedback, status: st });
+      Object.assign(s, { score: score === "" ? null : Number(score), feedback, status: st });
+      toast("Saved"); tNav(); then();
+    } catch (e){ $("#rv-e").textContent = errMsg(e); btns.forEach(b => b.disabled = false); }
+  };
+  $("#rv-next").onclick = () => save(() => nextId ? go(nextId) : renderReviewOne());
+  if ($("#rv-save")) $("#rv-save").onclick = () => save(() => renderReviewOne());
+  if (!imgs && s.responses.some(r => r.drawing || r.photos)){
+    api("getSubmissionImages", S.t.pass, s.id).then(x => { S.t.imgs[s.id] = x; if (S.t.subId === s.id) renderReviewOne(); })
+      .catch(e => toast("Pictures didn't load: " + errMsg(e), true));
+  }
+}
+
+/* ---- challenges ---- */
+function renderChallenges(){
+  const d = T();
+  const probs = d.problems.slice().sort((a, b) => (b.postDate || "9999").localeCompare(a.postDate || "9999") || a.title.localeCompare(b.title));
+  const counts = {}; d.submissions.forEach(s => { const c = counts[s.problemId] = counts[s.problemId] || { all: 0, todo: 0 }; c.all++; if (s.status === "Needs review") c.todo++; });
+  const today = d.today;
+  const shown = p => p.status === "Visible" ? (p.postDate && p.postDate > today ? `<span class="pill in">Posts ${esc(fmtShort(p.postDate))}</span>` : `<span class="pill vis">Visible</span>`) : `<span class="pill hid">Hidden</span>`;
+  app.innerHTML = `
+    <div class="row"><h2 style="flex:1">Challenges</h2><button class="btn ghost" type="button" id="imp">Paste from Claude</button><button class="btn" type="button" id="new">+ New challenge</button></div>
+    ${probs.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Posts</th><th>Challenge</th><th>Classes</th><th>Status</th><th>Work</th><th></th></tr></thead><tbody>
+      ${probs.map(p => { const c = counts[p.id] || { all: 0, todo: 0 }; return `<tr>
+        <td class="num">${p.postDate ? esc(fmtShort(p.postDate)) : "—"}</td>
+        <td><b>${esc(p.title)}</b><div class="dim">${esc([p.type, unitLabel(p.units), p.points + " pts", p.dueDate ? "due " + fmtShort(p.dueDate) : ""].filter(Boolean).join(" · "))}</div></td>
+        <td>${p.classes.length ? esc(p.classes.join(", ")) : `<span class="dim">All</span>`}</td>
+        <td>${shown(p)}</td>
+        <td class="num">${c.all}${c.todo ? ` <span class="pill in">${c.todo} new</span>` : ""}</td>
+        <td><div class="row" style="flex-wrap:nowrap;gap:6px"><button class="btn ghost sm" type="button" data-edit="${esc(p.id)}">Edit</button><button class="btn ghost sm" type="button" data-tog="${esc(p.id)}">${p.status === "Visible" ? "Hide" : "Show"}</button></div></td></tr>`; }).join("")}
+    </tbody></table></div>` : `<div class="card empty"><h2>No challenges yet</h2><p style="margin-top:6px">Add one yourself, or paste a week of challenges from Claude.</p></div>`}`;
+  $("#new").onclick = () => { S.t.edit = { id: "", status: "Visible", postDate: today, dueDate: "", title: "", type: TYPES[0][0], units: "", topics: "", points: 5, classes: [], prompt: "", parts: ["", ""], image: undefined, hasImage: false }; renderTeacher(); };
+  $("#imp").onclick = () => { S.t.view = "import"; renderTeacher(); };
+  $$("[data-edit]").forEach(b => b.onclick = () => { const p = probById(b.dataset.edit); S.t.edit = JSON.parse(JSON.stringify(p)); S.t.edit.image = undefined; if (!S.t.edit.parts.length) S.t.edit.parts = [""]; renderTeacher(); window.scrollTo(0, 0); });
+  $$("[data-tog]").forEach(b => b.onclick = async () => {
+    const p = probById(b.dataset.tog); const to = p.status === "Visible" ? "Hidden" : "Visible"; b.disabled = true;
+    try { await api("setProblemStatus", S.t.pass, p.id, to); p.status = to; renderChallenges(); toast(to === "Visible" ? "Students can see it now" : "Hidden from students"); }
+    catch (e){ toast(errMsg(e), true); b.disabled = false; }
+  });
+}
+
+function classOptions(){ return [...new Set(T().roster.map(r => r.cls))].filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, {numeric:true})); }
+
+function renderEditor(){
+  const e = S.t.edit; const isNew = !e.id;
+  const classes = classOptions();
+  const u = unitList(e.units);
+  app.innerHTML = `
+    <div><button class="link" type="button" id="back">← All challenges</button></div>
+    <section class="card stack">
+      <h2>${isNew ? "New challenge" : "Edit challenge"}</h2>
+      <div class="field"><label class="lbl" for="e-title">Title</label><input type="text" id="e-title" value="${esc(e.title)}" maxlength="200" placeholder="e.g. The Gym Membership Decision"></div>
+      <div class="grid3">
+        <div class="field"><label class="lbl" for="e-type">Type</label><select id="e-type">${TYPES.map(([t]) => `<option ${t === e.type ? "selected" : ""}>${esc(t)}</option>`).join("")}${e.type && !TYPES.some(([t]) => t === e.type) ? `<option selected>${esc(e.type)}</option>` : ""}</select></div>
+        <div class="field"><label class="lbl" for="e-pts">Points</label><input type="number" id="e-pts" min="0" value="${esc(e.points)}"></div>
+        <div class="field"><label class="lbl" for="e-status">Students can see it?</label><select id="e-status"><option value="Visible" ${e.status === "Visible" ? "selected" : ""}>Yes (on the post date)</option><option value="Hidden" ${e.status !== "Visible" ? "selected" : ""}>No, keep it hidden</option></select></div>
+        <div class="field"><label class="lbl" for="e-post">Post date</label><input type="date" id="e-post" value="${esc(e.postDate)}"></div>
+        <div class="field"><label class="lbl" for="e-due">Due date (optional)</label><input type="date" id="e-due" value="${esc(e.dueDate)}"></div>
+        <div class="field"><label class="lbl" for="e-topics">Topics</label><input type="text" id="e-topics" value="${esc(e.topics)}" placeholder="Percent of change; two-step equations"></div>
+      </div>
+      <div class="field"><span class="lbl">Units it uses</span><div class="chips" id="e-units">${UNITS.map((n, i) => `<button type="button" class="chip" data-u="${i + 1}" aria-pressed="${u.includes(i + 1)}" title="${esc(n)}">${i + 1}. ${esc(n)}</button>`).join("")}</div></div>
+      <div class="field"><span class="lbl">Classes (none selected = everyone)</span>${classes.length ? `<div class="chips" id="e-cls">${classes.map(c => `<button type="button" class="chip" data-c="${esc(c)}" aria-pressed="${e.classes.some(x => x.toLowerCase() === c.toLowerCase())}">${esc(c)}</button>`).join("")}</div>` : `<p class="dim">Add your class list first to post to specific classes.</p>`}</div>
+      <div class="field"><label class="lbl" for="e-prompt">The problem</label><textarea id="e-prompt" style="min-height:160px" placeholder="Set up the situation here.">${esc(e.prompt)}</textarea>
+        <p class="dim" style="margin-top:6px">Math: wrap it in \\( and \\), like \\( 3x + 5 = 20 \\). Bold: **word**. Bullets: start a line with "- ". Tables: | a | b |</p></div>
+      <div class="field"><span class="lbl">Picture (optional)</span>
+        <div class="row" id="e-img"></div></div>
+      <div class="field"><span class="lbl">Parts</span><div class="stack" id="e-parts" style="gap:8px"></div>
+        <div style="margin-top:8px"><button class="btn ghost sm" type="button" id="e-addpart">+ Add a part</button></div></div>
+      <p class="err" id="e-err" role="alert"></p>
+      <div class="row"><button class="btn" type="button" id="e-save">${isNew ? "Save challenge" : "Save changes"}</button><button class="btn ghost" type="button" id="e-prev">Preview</button>
+        <span class="spacer"></span>${isNew ? "" : `<button class="btn danger" type="button" id="e-del">Delete</button>`}</div>
+    </section>`;
+  const sync = () => {
+    e.title = $("#e-title").value; e.type = $("#e-type").value; e.points = $("#e-pts").value; e.status = $("#e-status").value;
+    e.postDate = $("#e-post").value; e.dueDate = $("#e-due").value; e.topics = $("#e-topics").value; e.prompt = $("#e-prompt").value;
+    e.units = $$("#e-units .chip").filter(c => c.getAttribute("aria-pressed") === "true").map(c => c.dataset.u).join(", ");
+    e.classes = $$("#e-cls .chip").filter(c => c.getAttribute("aria-pressed") === "true").map(c => c.dataset.c);
+    e.parts = $$("#e-parts textarea").map(t => t.value);
+  };
+  const drawParts = () => {
+    $("#e-parts").innerHTML = e.parts.map((t, i) => `<div class="partedit"><span class="part-l">${LETTERS[i]}</span><textarea aria-label="Part ${LETTERS[i]}">${esc(t)}</textarea><button class="btn ghost sm" type="button" data-rm="${i}" aria-label="Remove part ${LETTERS[i]}">✕</button></div>`).join("");
+    $$("#e-parts [data-rm]").forEach(b => b.onclick = () => { sync(); e.parts.splice(+b.dataset.rm, 1); drawParts(); });
+  };
+  const drawImg = () => {
+    const box = $("#e-img");
+    const show = typeof e.image === "string" ? e.image : (e.image === undefined && e.hasImage ? "existing" : null);
+    box.innerHTML = (show === "existing" ? `<span class="pill vis">Picture attached</span>` : show ? `<img class="imgprev" src="${show}" alt="Picture preview">` : "") +
+      `<label class="btn ghost sm" style="cursor:pointer">${show ? "Replace picture" : "Add a picture"}<input type="file" accept="image/*" hidden></label>` +
+      (show ? `<button class="btn ghost sm" type="button" id="e-rmimg">Remove picture</button>` : "");
+    $("input", box).onchange = async ev => { const f = ev.target.files[0]; if (!f) return; try { e.image = await shrinkImage(f, 1400, 0.85); drawImg(); } catch { toast("That picture couldn't be opened.", true); } };
+    const rm = $("#e-rmimg"); if (rm) rm.onclick = () => { e.image = null; e.hasImage = false; drawImg(); };
+  };
+  drawParts(); drawImg();
+  $$("#e-units .chip, #e-cls .chip").forEach(c => c.onclick = () => c.setAttribute("aria-pressed", String(c.getAttribute("aria-pressed") !== "true")));
+  $("#e-addpart").onclick = () => { sync(); if (e.parts.length < 12){ e.parts.push(""); drawParts(); $$("#e-parts textarea").pop().focus(); } };
+  $("#back").onclick = () => { S.t.edit = null; renderTeacher(); };
+  $("#e-prev").onclick = () => { sync(); previewProblem(e); };
+  $("#e-save").onclick = async () => {
+    sync(); $("#e-err").textContent = "";
+    if (!e.title.trim()){ $("#e-err").textContent = "Give the challenge a title."; return; }
+    const b = $("#e-save"); b.disabled = true; b.textContent = "Saving…";
+    try {
+      await api("saveProblem", S.t.pass, { id: e.id, status: e.status, postDate: e.postDate, dueDate: e.dueDate, title: e.title, type: e.type, units: e.units, topics: e.topics, points: e.points, classes: e.classes, prompt: e.prompt, parts: e.parts, image: e.image });
+      toast("Challenge saved"); S.t.edit = null; await loadTeacher(true);
+    } catch (err){ $("#e-err").textContent = errMsg(err); b.disabled = false; b.textContent = "Save"; }
+  };
+  const del = $("#e-del");
+  if (del) del.onclick = () => {
+    const box = modal(`<h2>Delete “${esc(e.title)}”?</h2><p class="muted">Students won't see it anymore. Work already turned in stays in your data sheet.</p><div class="row"><button class="btn danger" type="button" id="m-y">Delete it</button><button class="btn ghost" type="button" id="m-n">Cancel</button></div>`);
+    $("#m-n", box).onclick = closeModal;
+    $("#m-y", box).onclick = async () => { try { await api("deleteProblem", S.t.pass, e.id); closeModal(); toast("Deleted"); S.t.edit = null; await loadTeacher(true); } catch (err){ closeModal(); toast(errMsg(err), true); } };
+  };
+}
+
+function previewProblem(e){
+  const parts = e.parts.filter(x => String(x).trim());
+  const box = modal(`
+    <div class="row"><span class="badge" style="background:${typeColor(e.type)}">${esc(e.type)}</span><span class="badge" style="background:#f1eff7">${esc(e.points)} points</span></div>
+    <h2>${esc(e.title || "Untitled")}</h2>
+    <div class="prompt">${md(e.prompt)}${typeof e.image === "string" ? `<img src="${e.image}" alt="">` : ""}</div>
+    ${parts.map((q, i) => `<div class="part-h"><span class="part-l">${LETTERS[i]}</span><div class="part-q">${md(q)}</div></div>`).join("")}
+    <div><button class="btn ghost" type="button" id="m-x">Close preview</button></div>`, { wide: true });
+  typeset(box); $("#m-x", box).onclick = closeModal;
+}
+
+/* ---- import from Claude ---- */
+const IMPORT_EXAMPLE = `### The Gym Membership Decision
+Type: Real-World Decision
+Units: 3, 4
+Topics: Equations with variables on both sides; percent
+Points: 5
+Post: ${todayISO()}
+Due:
+Classes:
+Gym A costs $40 to join plus $25 a month. Gym B has no joining fee and costs $30 a month.
+a) Write an expression for the total cost of each gym after \\( m \\) months.
+b) After how many months do the gyms cost the same? Show your work.
+c) Your friend says Gym B is always the better deal. Is your friend right? Explain.`;
+function parseImport(text){
+  const blocks = String(text || "").replace(/\r/g, "").split(/^###\s+/m).map(b => b.trim()).filter(Boolean);
+  const out = [], warn = [];
+  blocks.forEach((b, bi) => {
+    const lines = b.split("\n"); const p = { title: lines.shift().trim(), status: "Visible", postDate: "", dueDate: "", type: "Multistep Challenge", units: "", topics: "", points: 5, classes: [], prompt: "", parts: [] };
+    let inBody = false, cur = null; const prompt = [];
+    for (const raw of lines){
+      const line = raw.replace(/\s+$/, "");
+      const meta = !inBody && /^(type|units?|topics?|points?|post(?: date)?|due(?: date)?|classes?|status|prompt)\s*:\s*(.*)$/i.exec(line.trim());
+      if (meta){
+        const k = meta[1].toLowerCase(), v = meta[2].trim();
+        if (k === "type") p.type = v || p.type;
+        else if (k.startsWith("unit")) p.units = unitList(v).join(", ");
+        else if (k.startsWith("topic")) p.topics = v;
+        else if (k.startsWith("point")) p.points = Number(v) || 0;
+        else if (k.startsWith("post")) p.postDate = v;
+        else if (k.startsWith("due")) p.dueDate = v;
+        else if (k.startsWith("class")) p.classes = v.split(/[,;]/).map(x => x.trim()).filter(Boolean);
+        else if (k === "status") p.status = /hid/i.test(v) ? "Hidden" : "Visible";
+        else if (k === "prompt"){ inBody = true; if (v) prompt.push(v); }
+        continue;
+      }
+      if (!inBody && !line.trim()) continue;
+      inBody = true;
+      const pm = /^\s*([a-l])\)\s+(.*)$/.exec(line);
+      if (pm){ cur = pm[2]; p.parts.push(cur); continue; }
+      if (p.parts.length) p.parts[p.parts.length - 1] += "\n" + line;
+      else prompt.push(line);
+    }
+    p.prompt = prompt.join("\n").trim();
+    p.parts = p.parts.map(x => x.trim());
+    [["postDate","Post"],["dueDate","Due"]].forEach(([k, l]) => { if (p[k] && !/^\d{4}-\d{2}-\d{2}$/.test(p[k])){ warn.push(`“${p.title}”: ${l} date should look like 2026-11-09. It was left blank.`); p[k] = ""; } });
+    if (!p.title) warn.push(`Challenge ${bi + 1} has no title.`);
+    else out.push(p);
+  });
+  return { list: out, warn };
+}
+function renderImport(){
+  app.innerHTML = `
+    <div><button class="link" type="button" id="back">← All challenges</button></div>
+    <section class="card stack">
+      <h2>Paste challenges from Claude</h2>
+      <p class="muted">Ask Claude for this week's challenges “in Think Bigger import format,” then paste everything here. You can add several challenges at once.</p>
+      <textarea id="im-t" style="min-height:260px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.88rem" placeholder="### Challenge title&#10;Type: …&#10;…"></textarea>
+      <details><summary style="cursor:pointer;font-weight:800;color:var(--violet-d)">What the format looks like</summary><div class="fmt" style="margin-top:8px">${esc(IMPORT_EXAMPLE)}</div>
+        <p class="dim" style="margin-top:6px">Each challenge starts with ###. Lines starting a), b), c) become parts. Leave Classes blank for everyone.</p></details>
+      <div class="row"><button class="btn" type="button" id="im-read">Check it</button></div>
+      <div id="im-out" class="stack" style="gap:10px"></div>
+    </section>`;
+  $("#back").onclick = () => { S.t.view = "challenges"; renderTeacher(); };
+  $("#im-read").onclick = () => {
+    const { list, warn } = parseImport($("#im-t").value);
+    const out = $("#im-out");
+    if (!list.length){ out.innerHTML = `<p class="err">No challenges found. Each one should start with ### and a title.</p>`; return; }
+    out.innerHTML = `${warn.map(w => `<div class="note warn">${esc(w)}</div>`).join("")}
+      <h3>Found ${list.length} challenge${list.length > 1 ? "s" : ""}</h3>
+      ${list.map(p => `<div class="pv"><div class="row"><span class="badge" style="background:${typeColor(p.type)}">${esc(p.type)}</span><b>${esc(p.title)}</b></div>
+        <span class="dim">${esc([unitLabel(p.units), p.points + " pts", p.parts.length + " parts", p.postDate ? "posts " + fmtShort(p.postDate) : "posts now", p.dueDate ? "due " + fmtShort(p.dueDate) : "", p.classes.length ? p.classes.join(", ") : "all classes"].filter(Boolean).join(" · "))}</span></div>`).join("")}
+      <div class="row"><div class="field"><label class="lbl" for="im-st">Students can see them?</label><select id="im-st"><option value="keep">Yes, on each post date</option><option value="Hidden">No, add them hidden for now</option></select></div></div>
+      <div class="row"><button class="btn" type="button" id="im-go">Add ${list.length} challenge${list.length > 1 ? "s" : ""}</button><button class="btn ghost" type="button" id="im-pv">Preview the first one</button></div>`;
+    $("#im-pv").onclick = () => previewProblem(list[0]);
+    $("#im-go").onclick = async () => {
+      const b = $("#im-go"); b.disabled = true; b.textContent = "Adding…";
+      const hide = $("#im-st").value === "Hidden";
+      try {
+        await api("importProblems", S.t.pass, list.map(p => Object.assign({}, p, hide ? { status: "Hidden" } : {})));
+        toast(`Added ${list.length} challenge${list.length > 1 ? "s" : ""}`); S.t.view = "challenges"; await loadTeacher(true);
+      } catch (e){ toast(errMsg(e), true); b.disabled = false; b.textContent = "Try again"; }
+    };
+    typeset(out);
+  };
+}
+
+/* ---- roster ---- */
+function renderRoster(){
+  const rows = S.t.rows || (S.t.rows = T().roster.map(r => Object.assign({}, r)));
+  const classes = [...new Set(rows.map(r => r.cls))].filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, {numeric:true}));
+  app.innerHTML = `
+    <div class="row"><h2 style="flex:1">Class list</h2><span class="dim">${rows.length} students${classes.length ? " · " + classes.length + " classes" : ""}</span></div>
+    <section class="card stack" style="gap:12px">
+      <h3>Add a whole class at once</h3>
+      <div class="grid2">
+        <div class="field"><label class="lbl" for="r-cls">Class name</label><input type="text" id="r-cls" list="r-cls-list" placeholder="e.g. Pre-Algebra P2"><datalist id="r-cls-list">${classes.map(c => `<option>${esc(c)}</option>`).join("")}</datalist></div>
+        <div class="field"><label class="lbl" for="r-names">Student names (one per line)</label><textarea id="r-names" style="min-height:110px" placeholder="Ana Rivera&#10;Jordan Lee&#10;…"></textarea></div>
+      </div>
+      <div><button class="btn ghost" type="button" id="r-add">Add to the list</button></div>
+    </section>
+    <section class="card stack" style="gap:12px">
+      <div class="row"><h3 style="flex:1">Everyone</h3><button class="btn ghost sm" type="button" id="r-pins">Make PINs for anyone without one</button></div>
+      <p class="dim">PINs are optional. If a student has one, they type it after picking their name, so classmates can't turn in work as them.</p>
+      ${rows.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Class</th><th>PIN</th><th>Active</th><th></th></tr></thead><tbody>
+        ${rows.map((r, i) => `<tr><td><input type="text" data-i="${i}" data-k="name" value="${esc(r.name)}" aria-label="Name"></td><td><input type="text" data-i="${i}" data-k="cls" value="${esc(r.cls)}" aria-label="Class" list="r-cls-list"></td>
+          <td style="width:110px"><input type="text" data-i="${i}" data-k="pin" value="${esc(r.pin)}" aria-label="PIN"></td>
+          <td><input type="checkbox" data-i="${i}" data-k="active" ${r.active !== false ? "checked" : ""} aria-label="Active"></td>
+          <td><button class="btn ghost sm" type="button" data-rm="${i}" aria-label="Remove ${esc(r.name)}">✕</button></td></tr>`).join("")}
+      </tbody></table></div>` : `<p class="muted">No students yet. Add a class above.</p>`}
+      <div class="row"><button class="btn" type="button" id="r-save">Save class list</button><span class="dim" id="r-msg"></span></div>
+    </section>`;
+  const dirty = () => { $("#r-msg").textContent = "Unsaved changes"; };
+  $$("input[data-k]").forEach(inp => inp.oninput = inp.onchange = () => { const r = rows[+inp.dataset.i]; if (inp.type === "checkbox") r.active = inp.checked; else r[inp.dataset.k] = inp.value; dirty(); });
+  $$("[data-rm]").forEach(b => b.onclick = () => { rows.splice(+b.dataset.rm, 1); renderRoster(); dirty(); });
+  $("#r-add").onclick = () => {
+    const cls = $("#r-cls").value.trim(); const names = $("#r-names").value.split("\n").map(x => x.split("\t")[0].trim()).filter(Boolean);
+    if (!cls || !names.length){ toast("Type a class name and at least one student.", true); return; }
+    names.forEach(n => { if (!rows.some(r => r.name.toLowerCase() === n.toLowerCase() && r.cls.toLowerCase() === cls.toLowerCase())) rows.push({ name: n, cls, pin: "", active: true }); });
+    renderRoster(); dirty();
+  };
+  $("#r-pins").onclick = () => { let n = 0; rows.forEach(r => { if (!String(r.pin).trim()){ r.pin = String(1000 + Math.floor(Math.random() * 9000)); n++; } }); renderRoster(); if (n) dirty(); toast(n ? `Made ${n} PINs. Save to keep them.` : "Everyone already has a PIN."); };
+  $("#r-save").onclick = async () => {
+    const b = $("#r-save"); b.disabled = true;
+    try { const n = await api("saveRoster", S.t.pass, rows); toast(`Saved ${n} students`); S.t.rows = null; await loadTeacher(true); }
+    catch (e){ toast(errMsg(e), true); b.disabled = false; }
+  };
+}
+
+/* ============ go ============ */
+if (START_VIEW === "teacher") startTeacher(); else startStudent();
+})();
+</script>
+</body>
+</html>
