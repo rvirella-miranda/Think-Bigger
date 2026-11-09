@@ -240,6 +240,15 @@ table.tbl{border-collapse:collapse;width:100%;font-size:.93rem}
   .nav{margin-left:0;width:100%}
   .card{padding:16px}
 }
+.cpill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.75rem;font-weight:800;background:var(--cb,#f1eff7);color:var(--cc,var(--muted));white-space:nowrap;vertical-align:1px}
+.cpill.plain{background:#f1eff7;color:var(--muted)}
+.chip.cchip{border-color:color-mix(in srgb,var(--cc) 35%,white)}
+.chip.cchip[aria-pressed="true"]{background:var(--cb);border-color:var(--cc);color:var(--cc)}
+.seg.cseg button[aria-pressed="true"]{background:var(--cc);color:#fff}
+.bulk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;border:1px dashed var(--line);border-radius:12px;color:var(--muted)}
+.bulk.on{border:1px solid var(--violet);background:var(--violet-l);color:var(--ink)}
+.tbl tr.selrow td{background:#f6f3ff}
+.tbl input[type=checkbox]{width:18px;height:18px;accent-color:var(--violet)}
 footer.foot{text-align:center;padding:20px 16px 30px;color:var(--dim);font-size:.85rem}
 </style>
 </head>
@@ -289,7 +298,7 @@ const rpcOk = d => { if (d && d.error) throw new Error(d.error); return d; };
 const rowToProblem = r => { IMG[r.id] = r.image_path || null; return {
   id: r.id, status: r.status, postDate: r.post_date || "", dueDate: r.due_date || "", title: r.title || "", type: r.type || "",
   units: r.units || "", topics: r.topics || "", points: Number(r.points) || 0, classes: r.classes || [], prompt: r.prompt || "",
-  parts: Array.isArray(r.parts) ? r.parts : [], hasImage: !!r.image_path }; };
+  parts: Array.isArray(r.parts) ? r.parts : [], hasImage: !!r.image_path, course: COURSES[r.course] ? r.course : "" }; };
 function dataUrlToBlob(u){
   const m = /^data:([^;]+);base64,(.*)$/.exec(u); const bin = atob(m[2]); const a = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
@@ -343,12 +352,14 @@ const API = {
   },
   async teacherSignOut(){ await sb.auth.signOut(); },
   async teacherData(){
-    const [roster, problems, subs, today] = await Promise.all([
+    const [roster, problems, subs, today, cc] = await Promise.all([
       sb.from("roster").select("*").order("cls").order("name").then(unwrap),
       sb.from("problems").select("*").then(unwrap),
       sb.from("submissions").select("*").order("saved_at", { ascending: false }).then(unwrap),
-      sb.rpc("local_today").then(unwrap)]);
-    return { today,
+      sb.rpc("local_today").then(unwrap),
+      sb.from("class_courses").select("*").then(unwrap)]);
+    const classCourses = {}; cc.forEach(r => { if (COURSES[r.course]) classCourses[r.cls] = r.course; });
+    return { today, classCourses,
       roster: roster.map(r => ({ name: r.name, cls: r.cls, pin: r.pin, active: r.active })),
       problems: problems.map(rowToProblem),
       submissions: subs.map(s => { RAW[s.id] = s.responses || []; return {
@@ -379,7 +390,7 @@ const API = {
   async saveProblem(_, p){
     const title = String(p.title || "").trim(); if (!title) throw new Error("Every challenge needs a title.");
     const row = { status: p.status === "Visible" ? "Visible" : "Hidden", post_date: cleanDate(p.postDate), due_date: cleanDate(p.dueDate),
-      title, type: p.type || "", units: p.units || "", topics: p.topics || "", points: Math.max(0, Number(p.points) || 0),
+      title, type: p.type || "", units: p.units || "", course: COURSES[p.course] ? p.course : "", topics: p.topics || "", points: Math.max(0, Number(p.points) || 0),
       classes: Array.isArray(p.classes) ? p.classes : [], prompt: p.prompt || "",
       parts: (p.parts || []).map(x => String(x || "").trim()).filter(Boolean), updated_at: new Date().toISOString() };
     if (p.image === null) row.image_path = null;
@@ -389,7 +400,17 @@ const API = {
   },
   async importProblems(_, list){ const ids = []; for (const p of list) ids.push(await API.saveProblem(_, p)); return ids; },
   async setProblemStatus(_, id, status){ unwrap(await sb.from("problems").update({ status, updated_at: new Date().toISOString() }).eq("id", id)); return true; },
+  async setProblemsStatus(ids, status){ unwrap(await sb.from("problems").update({ status, updated_at: new Date().toISOString() }).in("id", ids)); return true; },
+  async deleteProblems(ids){ unwrap(await sb.from("problems").delete().in("id", ids)); return true; },
   async deleteProblem(_, id){ unwrap(await sb.from("problems").delete().eq("id", id)); return true; },
+  async saveClassCourses(map){
+    const rows = Object.entries(map).map(([cls, course]) => ({ cls, course: COURSES[course] ? course : "" }));
+    const keep = rows.map(r => r.cls);
+    const existing = unwrap(await sb.from("class_courses").select("cls")).map(r => r.cls).filter(c => !keep.includes(c));
+    if (existing.length) unwrap(await sb.from("class_courses").delete().in("cls", existing));
+    if (rows.length) unwrap(await sb.from("class_courses").upsert(rows));
+    return true;
+  },
   async saveRoster(_, rows){ return unwrap(await sb.rpc("replace_roster", { p_rows: rows.map(r => ({ name: r.name, cls: r.cls, pin: String(r.pin || ""), active: r.active !== false })) })); }
 };
 async function api(fn, ...args){
@@ -443,8 +464,15 @@ const TYPES = [
   ["Multistep Challenge", "var(--lav)"]
 ];
 const typeColor = t => (TYPES.find(x => x[0].toLowerCase() === String(t).toLowerCase()) || [0, "var(--lav)"])[1];
-const UNITS = ["Rational Numbers","Real Numbers","Expressions, Equations & Inequalities","Ratios, Proportions & Percent","Functions & Linear Relationships","Geometry Foundations","Transformations","Pythagorean Theorem","Circles & Area of Composite Figures","Surface Area & Volume","Statistics","Probability","Financial Literacy"];
-const unitList = s => String(s || "").split(/[,;\s]+/).map(x => parseInt(x, 10)).filter(n => n >= 1 && n <= 13);
+const COURSES = {
+  "Pre-Algebra": { color: "#b0156f", bg: "#ffe0f0", units: ["Rational Numbers","Real Numbers","Expressions, Equations & Inequalities","Ratios, Proportions & Percent","Functions & Linear Relationships","Geometry Foundations","Transformations","Pythagorean Theorem","Circles & Area of Composite Figures","Surface Area & Volume","Statistics","Probability","Financial Literacy","End-of-Year Review"] },
+  "Algebra 1": { color: "#0a6683", bg: "#d4eef6", units: ["Solving Equations & Inequalities","Functions and Domain & Range","Intro to Linear Equations","Linear Equations & Inequalities","Systems of Equations & Inequalities","Exponent Laws & Radicals","Operations with Polynomials","Factoring Polynomials","Exponential Functions","Arithmetic & Geometric Sequences","Quadratic Functions","Quadratic Equations","End-of-Year Review"] }
+};
+const COURSE_NAMES = Object.keys(COURSES);
+const normCourse = s => { const t = String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); return /^prealg/.test(t) ? "Pre-Algebra" : /^alg(ebra)?(1|i|one)?$/.test(t) ? "Algebra 1" : ""; };
+const cVars = c => COURSES[c] ? `--cc:${COURSES[c].color};--cb:${COURSES[c].bg}` : "";
+const coursePill = c => COURSES[c] ? `<span class="cpill" style="${cVars(c)}">${esc(c)}</span>` : "";
+const unitList = s => String(s || "").split(/[,;\s]+/).map(x => parseInt(x, 10)).filter(n => n >= 1 && n <= 20);
 const unitLabel = s => { const u = unitList(s); return u.length ? (u.length === 1 ? "Unit " : "Units ") + u.join(" + ") : ""; };
 const LETTERS = "abcdefghijklm";
 
@@ -1035,7 +1063,7 @@ async function startTeacher(){
 async function loadTeacher(keepView){
   try {
     S.t.data = await api("teacherData", S.t.pass);
-    S.t.rows = null;
+    S.t.rows = null; S.t.cc = null;
     if (!keepView){ S.t.view = "review"; S.t.subId = null; S.t.edit = null; }
     renderTeacher();
   } catch (e){
@@ -1071,7 +1099,7 @@ function renderReviewList(){
   app.innerHTML = `
     <div class="row"><h2 style="flex:1">Review student work</h2><button class="btn ghost sm" type="button" id="csv">Download scores (CSV)</button><button class="btn ghost sm" type="button" id="refresh">Refresh</button></div>
     <div class="filters">
-      <div class="field"><label class="lbl" for="f-p">Challenge</label><select id="f-p"><option value="">All challenges</option>${probs.map(p => `<option value="${esc(p.id)}" ${p.id === f.pid ? "selected" : ""}>${esc(p.title)}</option>`).join("")}</select></div>
+      <div class="field"><label class="lbl" for="f-p">Challenge</label><select id="f-p"><option value="">All challenges</option>${[...COURSE_NAMES, ""].map(c => { const g = probs.filter(p => p.course === c); return g.length ? `<optgroup label="${esc(c || "No course")}">${g.map(p => `<option value="${esc(p.id)}" ${p.id === f.pid ? "selected" : ""}>${esc(p.title)}</option>`).join("")}</optgroup>` : ""; }).join("")}</select></div>
       <div class="field"><label class="lbl" for="f-c">Class</label><select id="f-c"><option value="">All classes</option>${classes.map(c => `<option ${c === f.cls ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
       <div class="field"><label class="lbl" for="f-s">Status</label><select id="f-s">${[["Needs review","Needs review"],["Revise","Sent back for changes"],["Reviewed","Graded"],["Draft","Not turned in yet (drafts)"],["","Everything"]].map(([v, l]) => `<option value="${v}" ${v === f.status ? "selected" : ""}>${l}</option>`).join("")}</select></div>
     </div>
@@ -1178,23 +1206,62 @@ function renderReviewOne(){
 /* ---- challenges ---- */
 function renderChallenges(){
   const d = T();
-  const probs = d.problems.slice().sort((a, b) => (b.postDate || "9999").localeCompare(a.postDate || "9999") || a.title.localeCompare(b.title));
-  const counts = {}; d.submissions.forEach(s => { const c = counts[s.problemId] = counts[s.problemId] || { all: 0, todo: 0 }; c.all++; if (s.status === "Needs review") c.todo++; });
+  const f = S.t.cf || (S.t.cf = "");
+  const sel = S.t.sel || (S.t.sel = new Set());
+  const all = d.problems.slice().sort((a, b) => (b.postDate || "9999").localeCompare(a.postDate || "9999") || a.title.localeCompare(b.title));
+  const probs = all.filter(p => !f || (f === "none" ? !p.course : p.course === f));
+  [...sel].forEach(id => { if (!probs.some(p => p.id === id)) sel.delete(id); });
+  const counts = {}; d.submissions.forEach(s => { const c = counts[s.problemId] = counts[s.problemId] || { all: 0, todo: 0 }; if (s.status !== "Draft") c.all++; if (s.status === "Needs review") c.todo++; });
   const today = d.today;
   const shown = p => p.status === "Visible" ? (p.postDate && p.postDate > today ? `<span class="pill in">Posts ${esc(fmtShort(p.postDate))}</span>` : `<span class="pill vis">Visible</span>`) : `<span class="pill hid">Hidden</span>`;
+  const n = c => all.filter(p => c === "none" ? !p.course : p.course === c).length;
+  const filters = [["", "All", all.length], ...COURSE_NAMES.map(c => [c, c, n(c)]), ...(n("none") ? [["none", "No course", n("none")]] : [])];
+  const allOn = probs.length > 0 && probs.every(p => sel.has(p.id));
   app.innerHTML = `
     <div class="row"><h2 style="flex:1">Challenges</h2><button class="btn ghost" type="button" id="imp">Paste from Claude</button><button class="btn" type="button" id="new">+ New challenge</button></div>
-    ${probs.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Posts</th><th>Challenge</th><th>Classes</th><th>Status</th><th>Work</th><th></th></tr></thead><tbody>
-      ${probs.map(p => { const c = counts[p.id] || { all: 0, todo: 0 }; return `<tr>
+    <div class="chips" role="group" aria-label="Show challenges for">${filters.map(([k, l, c]) => `<button type="button" class="chip ${COURSES[k] ? "cchip" : ""}" style="${cVars(k)}" data-f="${esc(k)}" aria-pressed="${f === k}">${esc(l)} <span class="dim">${c}</span></button>`).join("")}</div>
+    <div class="bulk ${sel.size ? "on" : ""}" id="bulk">
+      <b>${sel.size ? `${sel.size} selected` : "Check challenges to change several at once"}</b>
+      <span class="spacer"></span>
+      <button class="btn ghost sm" type="button" data-bulk="Visible" ${sel.size ? "" : "disabled"}>Make visible</button>
+      <button class="btn ghost sm" type="button" data-bulk="Hidden" ${sel.size ? "" : "disabled"}>Hide</button>
+      <button class="btn danger sm" type="button" data-bulk="delete" ${sel.size ? "" : "disabled"}>Delete</button>
+      ${sel.size ? `<button class="link" type="button" id="b-clear">Clear</button>` : ""}
+    </div>
+    ${probs.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th style="width:36px"><input type="checkbox" id="sel-all" ${allOn ? "checked" : ""} aria-label="Select all shown"></th><th>Posts</th><th>Challenge</th><th>Classes</th><th>Status</th><th>Work</th><th></th></tr></thead><tbody>
+      ${probs.map(p => { const c = counts[p.id] || { all: 0, todo: 0 }; return `<tr class="${sel.has(p.id) ? "selrow" : ""}">
+        <td><input type="checkbox" data-sel="${esc(p.id)}" ${sel.has(p.id) ? "checked" : ""} aria-label="Select ${esc(p.title)}"></td>
         <td class="num">${p.postDate ? esc(fmtShort(p.postDate)) : "—"}</td>
-        <td><b>${esc(p.title)}</b><div class="dim">${esc([p.type, unitLabel(p.units), p.points + " pts", p.dueDate ? "due " + fmtShort(p.dueDate) : ""].filter(Boolean).join(" · "))}</div></td>
-        <td>${p.classes.length ? esc(p.classes.join(", ")) : `<span class="dim">All</span>`}</td>
+        <td>${coursePill(p.course)} <b>${esc(p.title)}</b><div class="dim">${esc([p.type, unitLabel(p.units), p.points + " pts", p.dueDate ? "due " + fmtShort(p.dueDate) : ""].filter(Boolean).join(" · "))}</div></td>
+        <td>${p.classes.length ? p.classes.map(cl => `<span class="cpill ${classCourse(cl) ? "" : "plain"}" style="${cVars(classCourse(cl))}">${esc(cl)}</span>`).join(" ") : `<span class="dim">All</span>`}</td>
         <td>${shown(p)}</td>
         <td class="num">${c.all}${c.todo ? ` <span class="pill in">${c.todo} new</span>` : ""}</td>
         <td><div class="row" style="flex-wrap:nowrap;gap:6px"><button class="btn ghost sm" type="button" data-edit="${esc(p.id)}">Edit</button><button class="btn ghost sm" type="button" data-tog="${esc(p.id)}">${p.status === "Visible" ? "Hide" : "Show"}</button></div></td></tr>`; }).join("")}
-    </tbody></table></div>` : `<div class="card empty"><h2>No challenges yet</h2><p style="margin-top:6px">Add one yourself, or paste a week of challenges from Claude.</p></div>`}`;
-  $("#new").onclick = () => { S.t.edit = { id: "", status: "Visible", postDate: today, dueDate: "", title: "", type: TYPES[0][0], units: "", topics: "", points: 5, classes: [], prompt: "", parts: ["", ""], image: undefined, hasImage: false }; renderTeacher(); };
+    </tbody></table></div>` : `<div class="card empty"><h2>No challenges ${f ? "here" : "yet"}</h2><p style="margin-top:6px">Add one yourself, or paste a week of challenges from Claude.</p></div>`}`;
+  $$("[data-f]").forEach(b => b.onclick = () => { S.t.cf = b.dataset.f; renderChallenges(); });
+  $("#new").onclick = () => { const course = COURSES[f] ? f : ""; S.t.edit = { id: "", status: "Visible", postDate: today, dueDate: "", title: "", type: TYPES[0][0], course, units: "", topics: "", points: 5, classes: course ? classOptions().filter(c => classCourse(c) === course) : [], prompt: "", parts: ["", ""], image: undefined, hasImage: false }; renderTeacher(); };
   $("#imp").onclick = () => { S.t.view = "import"; renderTeacher(); };
+  const sa = $("#sel-all"); if (sa) sa.onchange = () => { probs.forEach(p => sa.checked ? sel.add(p.id) : sel.delete(p.id)); renderChallenges(); };
+  $$("[data-sel]").forEach(cb => cb.onchange = () => { cb.checked ? sel.add(cb.dataset.sel) : sel.delete(cb.dataset.sel); renderChallenges(); });
+  if ($("#b-clear")) $("#b-clear").onclick = () => { sel.clear(); renderChallenges(); };
+  $$("[data-bulk]").forEach(b => b.onclick = () => {
+    const ids = [...sel], what = b.dataset.bulk, many = ids.length + " challenge" + (ids.length > 1 ? "s" : "");
+    const go = async () => {
+      $$("[data-bulk]").forEach(x => x.disabled = true);
+      try {
+        if (what === "delete") await api("deleteProblems", ids); else await api("setProblemsStatus", ids, what);
+        sel.clear(); closeModal();
+        toast(what === "delete" ? `Deleted ${many}` : what === "Visible" ? `${many} visible to students` : `Hid ${many}`);
+        await loadTeacher(true);
+      } catch (e){ closeModal(); toast(errMsg(e), true); renderChallenges(); }
+    };
+    if (what !== "delete") return go();
+    const withWork = ids.filter(id => (counts[id] || { all: 0 }).all > 0).length;
+    const box = modal(`<h2>Delete ${many}?</h2><p class="muted">Students won't see ${ids.length > 1 ? "them" : "it"} anymore. This can't be undone.</p>
+      ${withWork ? `<div class="note warn">${withWork} of these ${withWork > 1 ? "have" : "has"} student work turned in. The work stays saved, but it won't be linked to a challenge anymore. Hiding instead keeps everything together.</div>` : ""}
+      <div class="row"><button class="btn danger" type="button" id="m-y">Delete ${many}</button><button class="btn ghost" type="button" id="m-n">Cancel</button></div>`);
+    $("#m-n", box).onclick = closeModal; $("#m-y", box).onclick = go;
+  });
   $$("[data-edit]").forEach(b => b.onclick = () => { const p = probById(b.dataset.edit); S.t.edit = JSON.parse(JSON.stringify(p)); S.t.edit.image = undefined; if (!S.t.edit.parts.length) S.t.edit.parts = [""]; renderTeacher(); window.scrollTo(0, 0); });
   $$("[data-tog]").forEach(b => b.onclick = async () => {
     const p = probById(b.dataset.tog); const to = p.status === "Visible" ? "Hidden" : "Visible"; b.disabled = true;
@@ -1205,15 +1272,23 @@ function renderChallenges(){
 
 function classOptions(){ return [...new Set(T().roster.map(r => r.cls))].filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, {numeric:true})); }
 
+function classCourse(c){ const m = (T() && T().classCourses) || {}; return m[c] || ""; }
+function classChip(c, pressed, attrs){ const cc = classCourse(c); return `<button type="button" class="chip ${cc ? "cchip" : ""}" style="${cVars(cc)}" ${attrs} aria-pressed="${pressed}">${esc(c)}</button>`; }
+function mismatch(course, classes){
+  if (!COURSES[course]) return "";
+  const bad = classes.filter(c => classCourse(c) && classCourse(c) !== course);
+  return bad.length ? `<p class="note warn" style="margin-top:8px">${bad.map(c => `<b>${esc(c)}</b>`).join(", ")} ${bad.length > 1 ? "are" : "is a"} ${esc(classCourse(bad[0]))} class${bad.length > 1 ? "es" : ""}, but this is ${course === "Algebra 1" ? "an" : "a"} ${esc(course)} challenge.</p>` : "";
+}
+
 function renderEditor(){
   const e = S.t.edit; const isNew = !e.id;
   const classes = classOptions();
-  const u = unitList(e.units);
   app.innerHTML = `
     <div><button class="link" type="button" id="back">← All challenges</button></div>
     <section class="card stack">
       <h2>${isNew ? "New challenge" : "Edit challenge"}</h2>
       <div class="field"><label class="lbl" for="e-title">Title</label><input type="text" id="e-title" value="${esc(e.title)}" maxlength="200" placeholder="e.g. The Gym Membership Decision"></div>
+      <div class="field"><span class="lbl">Course</span><div class="seg cseg" id="e-course" role="group" aria-label="Course">${COURSE_NAMES.map(c => `<button type="button" data-course="${esc(c)}" style="${cVars(c)}">${esc(c)}</button>`).join("")}</div></div>
       <div class="grid3">
         <div class="field"><label class="lbl" for="e-type">Type</label><select id="e-type">${TYPES.map(([t]) => `<option ${t === e.type ? "selected" : ""}>${esc(t)}</option>`).join("")}${e.type && !TYPES.some(([t]) => t === e.type) ? `<option selected>${esc(e.type)}</option>` : ""}</select></div>
         <div class="field"><label class="lbl" for="e-pts">Points</label><input type="number" id="e-pts" min="0" value="${esc(e.points)}"></div>
@@ -1222,8 +1297,8 @@ function renderEditor(){
         <div class="field"><label class="lbl" for="e-due">Due date (optional)</label><input type="date" id="e-due" value="${esc(e.dueDate)}"></div>
         <div class="field"><label class="lbl" for="e-topics">Topics</label><input type="text" id="e-topics" value="${esc(e.topics)}" placeholder="Percent of change; two-step equations"></div>
       </div>
-      <div class="field"><span class="lbl">Units it uses</span><div class="chips" id="e-units">${UNITS.map((n, i) => `<button type="button" class="chip" data-u="${i + 1}" aria-pressed="${u.includes(i + 1)}" title="${esc(n)}">${i + 1}. ${esc(n)}</button>`).join("")}</div></div>
-      <div class="field"><span class="lbl">Classes (none selected = everyone)</span>${classes.length ? `<div class="chips" id="e-cls">${classes.map(c => `<button type="button" class="chip" data-c="${esc(c)}" aria-pressed="${e.classes.some(x => x.toLowerCase() === c.toLowerCase())}">${esc(c)}</button>`).join("")}</div>` : `<p class="dim">Add your class list first to post to specific classes.</p>`}</div>
+      <div class="field"><span class="lbl" id="e-units-lbl">Units it uses</span><div id="e-units"></div></div>
+      <div class="field"><span class="lbl">Classes (none selected = everyone)</span>${classes.length ? `<div id="e-cls"></div>` : `<p class="dim">Add your class list first to post to specific classes.</p>`}</div>
       <div class="field"><label class="lbl" for="e-prompt">The problem</label><textarea id="e-prompt" style="min-height:160px" placeholder="Set up the situation here.">${esc(e.prompt)}</textarea>
         <p class="dim" style="margin-top:6px">Math: wrap it in \\( and \\), like \\( 3x + 5 = 20 \\). Bold: **word**. Bullets: start a line with "- ". Tables: | a | b |</p></div>
       <div class="field"><span class="lbl">Picture (optional)</span>
@@ -1237,10 +1312,33 @@ function renderEditor(){
   const sync = () => {
     e.title = $("#e-title").value; e.type = $("#e-type").value; e.points = $("#e-pts").value; e.status = $("#e-status").value;
     e.postDate = $("#e-post").value; e.dueDate = $("#e-due").value; e.topics = $("#e-topics").value; e.prompt = $("#e-prompt").value;
-    e.units = $$("#e-units .chip").filter(c => c.getAttribute("aria-pressed") === "true").map(c => c.dataset.u).join(", ");
-    e.classes = $$("#e-cls .chip").filter(c => c.getAttribute("aria-pressed") === "true").map(c => c.dataset.c);
     e.parts = $$("#e-parts textarea").map(t => t.value);
   };
+  const drawCourse = () => $$("#e-course button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.course === e.course)));
+  const drawUnits = () => {
+    const box = $("#e-units"), u = unitList(e.units);
+    if (!COURSES[e.course]){ box.innerHTML = `<p class="dim">Pick a course above to see its units.</p>`; return; }
+    box.innerHTML = `<div class="chips">${COURSES[e.course].units.map((n, i) => `<button type="button" class="chip cchip" style="${cVars(e.course)}" data-u="${i + 1}" aria-pressed="${u.includes(i + 1)}">${i + 1}. ${esc(n)}</button>`).join("")}</div>`;
+    $$("[data-u]", box).forEach(c => c.onclick = () => {
+      const n = +c.dataset.u, cur = unitList(e.units);
+      e.units = (cur.includes(n) ? cur.filter(x => x !== n) : cur.concat(n)).sort((a, b) => a - b).join(", ");
+      drawUnits();
+    });
+  };
+  const drawClasses = () => {
+    const box = $("#e-cls"); if (!box) return;
+    box.innerHTML = `<div class="chips">${classes.map((c, i) => classChip(c, e.classes.some(x => x.toLowerCase() === c.toLowerCase()), `data-ci="${i}"`)).join("")}</div>${mismatch(e.course, e.classes)}`;
+    $$("[data-ci]", box).forEach(b => b.onclick = () => {
+      const c = classes[+b.dataset.ci];
+      e.classes = e.classes.some(x => x.toLowerCase() === c.toLowerCase()) ? e.classes.filter(x => x.toLowerCase() !== c.toLowerCase()) : e.classes.concat(c);
+      drawClasses();
+    });
+  };
+  $$("#e-course button").forEach(b => b.onclick = () => {
+    e.course = b.dataset.course;
+    if (!e.classes.length){ const mine = classes.filter(c => classCourse(c) === e.course); if (mine.length) e.classes = mine; }
+    drawCourse(); drawUnits(); drawClasses();
+  });
   const drawParts = () => {
     $("#e-parts").innerHTML = e.parts.map((t, i) => `<div class="partedit"><span class="part-l">${LETTERS[i]}</span><textarea aria-label="Part ${LETTERS[i]}">${esc(t)}</textarea><button class="btn ghost sm" type="button" data-rm="${i}" aria-label="Remove part ${LETTERS[i]}">✕</button></div>`).join("");
     $$("#e-parts [data-rm]").forEach(b => b.onclick = () => { sync(); e.parts.splice(+b.dataset.rm, 1); drawParts(); });
@@ -1254,8 +1352,7 @@ function renderEditor(){
     $("input", box).onchange = async ev => { const f = ev.target.files[0]; if (!f) return; try { e.image = await shrinkImage(f, 1400, 0.85); drawImg(); } catch { toast("That picture couldn't be opened.", true); } };
     const rm = $("#e-rmimg"); if (rm) rm.onclick = () => { e.image = null; e.hasImage = false; drawImg(); };
   };
-  drawParts(); drawImg();
-  $$("#e-units .chip, #e-cls .chip").forEach(c => c.onclick = () => c.setAttribute("aria-pressed", String(c.getAttribute("aria-pressed") !== "true")));
+  drawCourse(); drawUnits(); drawClasses(); drawParts(); drawImg();
   $("#e-addpart").onclick = () => { sync(); if (e.parts.length < 12){ e.parts.push(""); drawParts(); $$("#e-parts textarea").pop().focus(); } };
   $("#back").onclick = () => { S.t.edit = null; renderTeacher(); };
   $("#e-prev").onclick = () => { sync(); previewProblem(e); };
@@ -1264,13 +1361,13 @@ function renderEditor(){
     if (!e.title.trim()){ $("#e-err").textContent = "Give the challenge a title."; return; }
     const b = $("#e-save"); b.disabled = true; b.textContent = "Saving…";
     try {
-      await api("saveProblem", S.t.pass, { id: e.id, status: e.status, postDate: e.postDate, dueDate: e.dueDate, title: e.title, type: e.type, units: e.units, topics: e.topics, points: e.points, classes: e.classes, prompt: e.prompt, parts: e.parts, image: e.image });
+      await api("saveProblem", S.t.pass, { id: e.id, status: e.status, postDate: e.postDate, dueDate: e.dueDate, title: e.title, type: e.type, course: e.course, units: e.units, topics: e.topics, points: e.points, classes: e.classes, prompt: e.prompt, parts: e.parts, image: e.image });
       toast("Challenge saved"); S.t.edit = null; await loadTeacher(true);
     } catch (err){ $("#e-err").textContent = errMsg(err); b.disabled = false; b.textContent = "Save"; }
   };
   const del = $("#e-del");
   if (del) del.onclick = () => {
-    const box = modal(`<h2>Delete “${esc(e.title)}”?</h2><p class="muted">Students won't see it anymore. Work already turned in stays in your data sheet.</p><div class="row"><button class="btn danger" type="button" id="m-y">Delete it</button><button class="btn ghost" type="button" id="m-n">Cancel</button></div>`);
+    const box = modal(`<h2>Delete “${esc(e.title)}”?</h2><p class="muted">Students won't see it anymore. Work already turned in stays saved.</p><div class="row"><button class="btn danger" type="button" id="m-y">Delete it</button><button class="btn ghost" type="button" id="m-n">Cancel</button></div>`);
     $("#m-n", box).onclick = closeModal;
     $("#m-y", box).onclick = async () => { try { await api("deleteProblem", S.t.pass, e.id); closeModal(); toast("Deleted"); S.t.edit = null; await loadTeacher(true); } catch (err){ closeModal(); toast(errMsg(err), true); } };
   };
@@ -1289,6 +1386,7 @@ function previewProblem(e){
 
 /* ---- import from Claude ---- */
 const IMPORT_EXAMPLE = `### The Gym Membership Decision
+Course: Pre-Algebra
 Type: Real-World Decision
 Units: 3, 4
 Topics: Equations with variables on both sides; percent
@@ -1304,14 +1402,15 @@ function parseImport(text){
   const blocks = String(text || "").replace(/\r/g, "").split(/^###\s+/m).map(b => b.trim()).filter(Boolean);
   const out = [], warn = [];
   blocks.forEach((b, bi) => {
-    const lines = b.split("\n"); const p = { title: lines.shift().trim(), status: "Visible", postDate: "", dueDate: "", type: "Multistep Challenge", units: "", topics: "", points: 5, classes: [], prompt: "", parts: [] };
+    const lines = b.split("\n"); const p = { title: lines.shift().trim(), status: "Visible", postDate: "", dueDate: "", course: "", type: "Multistep Challenge", units: "", topics: "", points: 5, classes: [], prompt: "", parts: [] };
     let inBody = false, cur = null; const prompt = [];
     for (const raw of lines){
       const line = raw.replace(/\s+$/, "");
-      const meta = !inBody && /^(type|units?|topics?|points?|post(?: date)?|due(?: date)?|classes?|status|prompt)\s*:\s*(.*)$/i.exec(line.trim());
+      const meta = !inBody && /^(course|type|units?|topics?|points?|post(?: date)?|due(?: date)?|classes?|status|prompt)\s*:\s*(.*)$/i.exec(line.trim());
       if (meta){
         const k = meta[1].toLowerCase(), v = meta[2].trim();
-        if (k === "type") p.type = v || p.type;
+        if (k === "course") p.course = normCourse(v);
+        else if (k === "type") p.type = v || p.type;
         else if (k.startsWith("unit")) p.units = unitList(v).join(", ");
         else if (k.startsWith("topic")) p.topics = v;
         else if (k.startsWith("point")) p.points = Number(v) || 0;
@@ -1356,7 +1455,8 @@ function renderImport(){
     if (!list.length){ out.innerHTML = `<p class="err">No challenges found. Each one should start with ### and a title.</p>`; return; }
     const classes = classOptions();
     const canon = c => classes.find(x => x.toLowerCase() === c.toLowerCase()) || c;
-    list.forEach(p => { p.classes = [...new Set(p.classes.map(canon))]; p.include = true; });
+    const ofCourse = c => classes.filter(x => classCourse(x) === c);
+    list.forEach(p => { p.classes = [...new Set(p.classes.map(canon))]; p.include = true; if (!p.classes.length && p.course) p.classes = ofCourse(p.course); });
     const unknown = [...new Set(list.flatMap(p => p.classes).filter(c => !classes.includes(c)))];
     const all = classes.concat(unknown);
     const chosen = () => list.filter(p => p.include);
@@ -1367,22 +1467,29 @@ function renderImport(){
       out.innerHTML = `${warn.map(w => `<div class="note warn">${esc(w)}</div>`).join("")}
         ${unknown.length ? `<div class="note warn">${unknown.map(c => `“${esc(c)}”`).join(", ")} ${unknown.length > 1 ? "aren't" : "isn't"} on your class list, so no student would see challenges assigned only to ${unknown.length > 1 ? "them" : "it"}. Unselect ${unknown.length > 1 ? "them" : "it"} below, or fix the name on your class list.</div>` : ""}
         <h3>Found ${list.length} challenge${list.length > 1 ? "s" : ""}</h3>
+        <div class="pv" style="background:#faf8ff">
+          <b>Which course are these for?</b>
+          <p class="dim">Sets the course (and its unit names and color) for every checked challenge.${classes.some(c => classCourse(c)) ? " Classes linked to that course on your class list are picked for you." : ""}</p>
+          <div class="seg cseg" role="group" aria-label="Course">${COURSE_NAMES.map(c => `<button type="button" data-gcourse="${esc(c)}" style="${cVars(c)}" aria-pressed="${inc.length > 0 && inc.every(p => p.course === c)}">${esc(c)}</button>`).join("")}</div>
+          ${inc.some(p => !p.course) ? `<p class="dim" style="margin-top:6px">Some challenges don't have a course yet.</p>` : ""}
+        </div>
         ${classes.length ? `<div class="pv" style="background:var(--violet-l);border-color:transparent">
           <b>Which classes get these?</b>
           <p class="dim">Pick classes here to set every checked challenge at once, or change each challenge below. When no class is picked, every class sees it.</p>
-          <div class="chips"><button type="button" class="chip" data-all="1" aria-pressed="${allEveryone}">Every class</button>${all.map((c, i) => `<button type="button" class="chip" data-gc="${i}" aria-pressed="${everyHas(c)}">${esc(c)}</button>`).join("")}</div>
+          <div class="chips"><button type="button" class="chip" data-all="1" aria-pressed="${allEveryone}">Every class</button>${all.map((c, i) => `${classChip(c, everyHas(c), `data-gc="${i}"`)}`).join("")}</div>
         </div>` : `<p class="dim">Add your class list to send challenges to specific classes. For now, every class will see them.</p>`}
         <div class="stack" style="gap:8px">${list.map((p, k) => `<div class="pv" style="${p.include ? "" : "opacity:.55"}">
           <div class="row"><label class="row" style="gap:8px;cursor:pointer;flex:1;min-width:12em"><input type="checkbox" data-inc="${k}" ${p.include ? "checked" : ""} aria-label="Add ${esc(p.title)}">
-            <span class="badge" style="background:${typeColor(p.type)}">${esc(p.type)}</span><b>${esc(p.title)}</b></label></div>
+            ${coursePill(p.course)}<span class="badge" style="background:${typeColor(p.type)}">${esc(p.type)}</span><b>${esc(p.title)}</b></label></div>
           <span class="dim">${esc([unitLabel(p.units), p.points + " pts", p.parts.length + " parts", p.postDate ? "posts " + fmtShort(p.postDate) : "posts now", p.dueDate ? "due " + fmtShort(p.dueDate) : ""].filter(Boolean).join(" · "))}</span>
-          ${all.length && p.include ? `<div class="chips"><span class="dim" style="align-self:center;font-weight:700">For:</span>${all.map((c, i) => `<button type="button" class="chip" data-k="${k}" data-c="${i}" aria-pressed="${p.classes.includes(c)}">${esc(c)}</button>`).join("")}${p.classes.length ? "" : `<span class="dim" style="align-self:center">every class</span>`}</div>` : ""}
+          ${all.length && p.include ? `<div class="chips"><span class="dim" style="align-self:center;font-weight:700">For:</span>${all.map((c, i) => `${classChip(c, p.classes.includes(c), `data-k="${k}" data-c="${i}"`)}`).join("")}${p.classes.length ? "" : `<span class="dim" style="align-self:center">every class</span>`}</div>${mismatch(p.course, p.classes)}` : ""}
         </div>`).join("")}</div>
         <div class="row"><div class="field"><label class="lbl" for="im-st">Students can see them?</label><select id="im-st"><option value="keep">Yes, on each post date</option><option value="Hidden">No, add them hidden for now</option></select></div></div>
         <div class="row"><button class="btn" type="button" id="im-go" ${inc.length ? "" : "disabled"}>Add ${inc.length} challenge${inc.length === 1 ? "" : "s"}</button><button class="btn ghost" type="button" id="im-pv">Preview the first one</button></div>`;
       const keepSt = S.t.imSt; if (keepSt) $("#im-st").value = keepSt;
       $("#im-st").onchange = e => S.t.imSt = e.target.value;
       $$("[data-inc]", out).forEach(cb => cb.onchange = () => { list[+cb.dataset.inc].include = cb.checked; draw(); });
+      $$("[data-gcourse]", out).forEach(b => b.onclick = () => { const c = b.dataset.gcourse; chosen().forEach(p => { p.course = c; const m = ofCourse(c); if (m.length) p.classes = m; }); draw(); });
       const allBtn = $("[data-all]", out); if (allBtn) allBtn.onclick = () => { chosen().forEach(p => p.classes = []); draw(); };
       $$("[data-gc]", out).forEach(b => b.onclick = () => {
         const c = all[+b.dataset.gc], on = everyHas(c);
@@ -1411,17 +1518,28 @@ function renderImport(){
 /* ---- roster ---- */
 function renderRoster(){
   const rows = S.t.rows || (S.t.rows = T().roster.map(r => Object.assign({}, r)));
+  const cc = S.t.cc || (S.t.cc = Object.assign({}, T().classCourses));
   const classes = [...new Set(rows.map(r => r.cls))].filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, {numeric:true}));
   app.innerHTML = `
     <div class="row"><h2 style="flex:1">Class list</h2><span class="dim">${rows.length} students${classes.length ? " · " + classes.length + " classes" : ""}</span></div>
     <section class="card stack" style="gap:12px">
       <h3>Add a whole class at once</h3>
       <div class="grid2">
-        <div class="field"><label class="lbl" for="r-cls">Class name</label><input type="text" id="r-cls" list="r-cls-list" placeholder="e.g. Pre-Algebra P2"><datalist id="r-cls-list">${classes.map(c => `<option>${esc(c)}</option>`).join("")}</datalist></div>
+        <div class="stack" style="gap:12px">
+          <div class="field"><label class="lbl" for="r-cls">Class name</label><input type="text" id="r-cls" list="r-cls-list" placeholder="e.g. 7M"><datalist id="r-cls-list">${classes.map(c => `<option>${esc(c)}</option>`).join("")}</datalist></div>
+          <div class="field"><label class="lbl" for="r-course">Course</label><select id="r-course"><option value="">Choose…</option>${COURSE_NAMES.map(c => `<option>${esc(c)}</option>`).join("")}</select></div>
+        </div>
         <div class="field"><label class="lbl" for="r-names">Student names (one per line)</label><textarea id="r-names" style="min-height:110px" placeholder="Ana Rivera&#10;Jordan Lee&#10;…"></textarea></div>
       </div>
       <div><button class="btn ghost" type="button" id="r-add">Add to the list</button></div>
     </section>
+    ${classes.length ? `<section class="card stack" style="gap:12px">
+      <h3>Your classes</h3>
+      <p class="dim">Link each class to its course. New challenges for a course are sent to its classes automatically, and you'll get a warning if a challenge goes to the wrong course.</p>
+      <div class="stack" style="gap:8px">${classes.map((c, i) => `<div class="row" style="gap:12px"><span class="cpill ${cc[c] ? "" : "plain"}" style="${cVars(cc[c])};min-width:4.5em;text-align:center;font-size:.9rem">${esc(c)}</span>
+        <div class="seg cseg" role="group" aria-label="Course for ${esc(c)}">${COURSE_NAMES.map(co => `<button type="button" data-cci="${i}" data-co="${esc(co)}" style="${cVars(co)}" aria-pressed="${cc[c] === co}">${esc(co)}</button>`).join("")}</div>
+        <span class="dim">${rows.filter(r => r.cls === c).length} students</span></div>`).join("")}</div>
+    </section>` : ""}
     <section class="card stack" style="gap:12px">
       <div class="row"><h3 style="flex:1">Everyone</h3><button class="btn ghost sm" type="button" id="r-pins">Make PINs for anyone without one</button></div>
       <p class="dim">PINs are optional. If a student has one, they type it after picking their name, so classmates can't turn in work as them.</p>
@@ -1436,8 +1554,9 @@ function renderRoster(){
   const dirty = () => { $("#r-msg").textContent = "Unsaved changes"; };
   $$("input[data-k]").forEach(inp => inp.oninput = inp.onchange = () => { const r = rows[+inp.dataset.i]; if (inp.type === "checkbox") r.active = inp.checked; else r[inp.dataset.k] = inp.value; dirty(); });
   $$("[data-rm]").forEach(b => b.onclick = () => { rows.splice(+b.dataset.rm, 1); renderRoster(); dirty(); });
+  $$("[data-cci]").forEach(b => b.onclick = () => { const c = classes[+b.dataset.cci]; cc[c] = cc[c] === b.dataset.co ? "" : b.dataset.co; renderRoster(); dirty(); });
   $("#r-add").onclick = () => {
-    const cls = $("#r-cls").value.trim(); const names = $("#r-names").value.split("\n").map(x => x.split("\t")[0].trim()).filter(Boolean);
+    const cls = $("#r-cls").value.trim(); const course = $("#r-course").value; if (cls && course) cc[cls] = course; const names = $("#r-names").value.split("\n").map(x => x.split("\t")[0].trim()).filter(Boolean);
     if (!cls || !names.length){ toast("Type a class name and at least one student.", true); return; }
     names.forEach(n => { if (!rows.some(r => r.name.toLowerCase() === n.toLowerCase() && r.cls.toLowerCase() === cls.toLowerCase())) rows.push({ name: n, cls, pin: "", active: true }); });
     renderRoster(); dirty();
@@ -1445,7 +1564,12 @@ function renderRoster(){
   $("#r-pins").onclick = () => { let n = 0; rows.forEach(r => { if (!String(r.pin).trim()){ r.pin = String(1000 + Math.floor(Math.random() * 9000)); n++; } }); renderRoster(); if (n) dirty(); toast(n ? `Made ${n} PINs. Save to keep them.` : "Everyone already has a PIN."); };
   $("#r-save").onclick = async () => {
     const b = $("#r-save"); b.disabled = true;
-    try { const n = await api("saveRoster", S.t.pass, rows); toast(`Saved ${n} students`); S.t.rows = null; await loadTeacher(true); }
+    try {
+      const n = await api("saveRoster", S.t.pass, rows);
+      const map = {}; [...new Set(rows.map(r => r.cls))].filter(Boolean).forEach(c => { if (cc[c]) map[c] = cc[c]; });
+      await api("saveClassCourses", map);
+      toast(`Saved ${n} students`); S.t.rows = null; S.t.cc = null; await loadTeacher(true);
+    }
     catch (e){ toast(errMsg(e), true); b.disabled = false; }
   };
 }
